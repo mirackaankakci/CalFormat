@@ -10,7 +10,7 @@ const ProductDetailsSection: React.FC = () => {
   ];
 
   const productFeatures = [
-    { icon: <Check className="w-5 h-5 text-[#ee7f1a]" />, text: "500g İçerik" },
+    { icon: <Check className="w-5 h-5 text-[#ee7f1a]" />, text: "250gr İçerik" },
     { icon: <Check className="w-5 h-5 text-[#ee7f1a]" />, text: "300+ Kullanım" },
     { icon: <Check className="w-5 h-5 text-[#ee7f1a]" />, text: "2 Yıl Raf Ömrü" },
     { icon: <Check className="w-5 h-5 text-[#ee7f1a]" />, text: "Çevre Dostu" }

@@ -21,7 +21,7 @@ const CTASection: React.FC = () => {
         
         <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-12">
           <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-8 text-white border border-white/30 transform hover:scale-105 transition-transform duration-300">
-            <div className="text-4xl font-bold">₺400,00</div>
+            <div className="text-4xl font-bold">₺799,00</div>
             <div className="text-orange-100 text-lg">Tek ödeme</div>
           </div>
           <div className="text-white text-3xl font-bold animate-pulse">+</div>

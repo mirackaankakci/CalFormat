@@ -1,12 +1,29 @@
 import React from 'react';
 import { Star, ShoppingCart } from 'lucide-react';
 import { benefits } from '../../data/benefits';
+import { useCart } from '../../contexts/CartContext';
+import { useNavigate } from 'react-router-dom';
 
 interface HeroSectionProps {
   isVisible: boolean;
 }
 
 const HeroSection: React.FC<HeroSectionProps> = ({ isVisible }) => {
+  const { addToCart } = useCart();
+  const navigate = useNavigate();
+
+  const handleAddToCart = () => {
+    addToCart({
+      id: 1,
+      name: "NaturClean Meyve & Sebze Temizleme Tozu",
+      price: 400.00,
+      image: "/calformat.webp",
+    });
+    
+    // Sepet sayfasına yönlendir
+    navigate('/cart');
+  };
+  
   return (
     <section className="relative py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
       <div className="max-w-7xl mx-auto relative z-10">
@@ -50,29 +67,17 @@ const HeroSection: React.FC<HeroSectionProps> = ({ isVisible }) => {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <button className="group bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] text-white px-8 py-4 rounded-full hover:shadow-2xl transition-all duration-300 transform hover:scale-105 font-semibold text-lg flex items-center justify-center gap-3 relative overflow-hidden">
+              <button 
+                onClick={handleAddToCart}
+                className="group bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] text-white px-8 py-4 rounded-full hover:shadow-2xl transition-all duration-300 transform hover:scale-105 font-semibold text-lg flex items-center justify-center gap-3 relative overflow-hidden"
+              >
                 <div className="absolute inset-0 bg-gradient-to-r from-[#d62d27] to-[#ee7f1a] opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <ShoppingCart className="w-5 h-5 relative z-10" />
-                <span className="relative z-10">Hemen Satın Al - ₺400,00</span>
+                <span className="relative z-10">Hemen Satın Al - ₺799,00</span>
               </button>
               <button className="border-2 border-[#ee7f1a] text-[#ee7f1a] px-8 py-4 rounded-full hover:bg-gradient-to-r hover:from-[#ee7f1a] hover:to-[#d62d27] hover:text-white transition-all duration-300 font-semibold text-lg transform hover:scale-105">
                 Daha Fazla Bilgi
               </button>
-            </div>
-
-            <div className="grid grid-cols-3 gap-8 pt-6">
-              <div className="text-center group cursor-pointer">
-                <div className="text-3xl font-bold bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] bg-clip-text text-transparent group-hover:scale-110 transition-transform duration-300">50K+</div>
-                <div className="text-sm text-gray-600">Mutlu Müşteri</div>
-              </div>
-              <div className="text-center group cursor-pointer">
-                <div className="text-3xl font-bold bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] bg-clip-text text-transparent group-hover:scale-110 transition-transform duration-300">99.8%</div>
-                <div className="text-sm text-gray-600">Memnuniyet</div>
-              </div>
-              <div className="text-center group cursor-pointer">
-                <div className="text-3xl font-bold bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] bg-clip-text text-transparent group-hover:scale-110 transition-transform duration-300">24/7</div>
-                <div className="text-sm text-gray-600">Destek</div>
-              </div>
             </div>
           </div>
 
