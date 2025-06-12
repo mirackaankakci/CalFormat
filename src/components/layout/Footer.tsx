@@ -1,5 +1,6 @@
 import React from 'react';
 import { Leaf } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Footer: React.FC = () => {
   return (
@@ -18,7 +19,7 @@ const Footer: React.FC = () => {
           <div>
             <h5 className="font-semibold mb-6 text-lg">Ürünler</h5>
             <ul className="space-y-3 text-gray-400">
-              {["Meyve Sebze Tozu", "Doğal Temizleyici", "Çok Amaçlı Temizlik"].map((item, index) => (
+              {["Meyve Sebze Temizleme Tozu"].map((item, index) => (
                 <li key={index} className="hover:text-[#ee7f1a] transition-colors duration-300 cursor-pointer">
                   {item}
                 </li>
@@ -28,24 +29,31 @@ const Footer: React.FC = () => {
           <div>
             <h5 className="font-semibold mb-6 text-lg">Destek</h5>
             <ul className="space-y-3 text-gray-400">
-              {["SSS", "İletişim", "Geri İade", "Kargo Takip"].map((item, index) => (
-                <li key={index} className="hover:text-[#ee7f1a] transition-colors duration-300 cursor-pointer">
-                  {item}
-                </li>
-              ))}
+              <li className="hover:text-[#ee7f1a] transition-colors duration-300 cursor-pointer">
+                <Link to="/faq" className="hover:text-[#ee7f1a] transition-colors duration-300">
+                  SSS
+                </Link>
+              </li>
+              <li className="hover:text-[#ee7f1a] transition-colors duration-300 cursor-pointer">
+                <Link to="/contact" className="hover:text-[#ee7f1a] transition-colors duration-300">
+                  İletişim
+                </Link>
+              </li>
+              <li className="hover:text-[#ee7f1a] transition-colors duration-300 cursor-pointer">
+                <Link to="/refund-policy" className="hover:text-[#ee7f1a] transition-colors duration-300">
+                  İade ve Değişim
+                </Link>
+              </li>
             </ul>
           </div>
           <div>
             <h5 className="font-semibold mb-6 text-lg">İletişim</h5>
             <div className="space-y-3 text-gray-400">
               <p className="hover:text-[#ee7f1a] transition-colors duration-300">
-                info@calformat.com
+                info@uniqcal.com.tr
               </p>
               <p className="hover:text-[#ee7f1a] transition-colors duration-300">
-                0850 123 45 67
-              </p>
-              <p className="text-sm">
-                7/24 Müşteri Hizmetleri
+                +90 850 288 78 78
               </p>
             </div>
           </div>
@@ -53,8 +61,9 @@ const Footer: React.FC = () => {
         <div className="border-t border-gray-800 pt-8 text-center">
           <p className="text-gray-400">
             &copy; 2024 CalFormat. Tüm hakları saklıdır. | 
-            <span className="text-[#ee7f1a] hover:text-[#d62d27] transition-colors duration-300 cursor-pointer"> Gizlilik Politikası</span> | 
-            <span className="text-[#ee7f1a] hover:text-[#d62d27] transition-colors duration-300 cursor-pointer"> Kullanım Şartları</span>
+            <Link to="/privacy-policy" className="text-[#ee7f1a] hover:text-[#d62d27] transition-colors duration-300 cursor-pointer"> Gizlilik Politikası</Link> | 
+            <Link to="/refund-policy" className="text-[#ee7f1a] hover:text-[#d62d27] transition-colors duration-300 cursor-pointer"> İptal İade Koşulları</Link> |
+            <Link to="/distance-sales-agreement" className="text-[#ee7f1a] hover:text-[#d62d27] transition-colors duration-300 cursor-pointer"> Mesafeli Satış Sözleşmesi</Link> | 
           </p>
         </div>
       </div>

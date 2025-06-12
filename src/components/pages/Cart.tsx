@@ -136,10 +136,6 @@ const Cart: React.FC = () => {
                       <Shield className="w-4 h-4 text-[#ee7f1a]" />
                       <span>Güvenli ödeme</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <ShoppingBag className="w-4 h-4 text-[#ee7f1a]" />
-                      <span>30 gün değişim garantisi</span>
-                    </div>
                   </div>
                 </div>
               </div>

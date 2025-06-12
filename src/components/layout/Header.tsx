@@ -25,7 +25,6 @@ const Header: React.FC = () => {
                 Stokta
               </span>
               <span>Ücretsiz Kargo</span>
-              <span>30 Gün Garanti</span>
             </div>
             <Link to="/cart" className="bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] text-white px-6 py-2 rounded-full hover:shadow-lg transition-all duration-300 transform hover:scale-105 flex items-center gap-2 relative">
               <ShoppingCart className="w-4 h-4" />

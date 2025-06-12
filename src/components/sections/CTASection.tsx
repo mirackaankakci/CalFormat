@@ -42,7 +42,7 @@ const CTASection: React.FC = () => {
             { icon: <Check className="w-5 h-5" />, text: "30 Gün Garanti" },
             { icon: <Check className="w-5 h-5" />, text: "Ücretsiz Kargo" },
             { icon: <Check className="w-5 h-5" />, text: "Güvenli Ödeme" },
-            { icon: <Check className="w-5 h-5" />, text: "24/7 Destek" }
+            
           ].map((item, index) => (
             <div key={index} className="flex items-center gap-2 hover:text-white transition-colors duration-300 cursor-pointer">
               {item.icon}
