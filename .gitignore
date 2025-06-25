@@ -1,25 +1,142 @@
-# Logs
+# .gitignore - GÜVENLİ VERSİYON
+
+# ===== GÜVENLİK - HASSAS DOSYALAR =====
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.backup
+
+# API Keys & Secrets
+*.key
+*.pem
+.secrets/
+config/secrets.js
+config/keys.js
+
+# ===== FIREBASE =====
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+.firebaserc
+
+# ===== BUILD VE DEPENDENCIES =====
+# Production build
+/build
+/dist
+/out
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Package lock files (sadece birini kullanın)
+# package-lock.json
+# yarn.lock
+
+# ===== DEVELOPMENT =====
+# IDE ve Editor dosyaları
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS dosyaları
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ===== LOGS =====
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# ===== TEMPORARY =====
+# Temporary folders
+tmp/
+temp/
+.tmp/
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# ===== TESTING =====
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# ===== CACHE =====
+# ESLint cache
+.eslintcache
+
+# Parcel cache
+.cache
+.parcel-cache
+
+# Next.js cache
+.next
+
+# Nuxt.js cache
+.nuxt
+
+# Gatsby cache
+.cache/
+public
+
+# ===== STORYBOOK =====
+storybook-static
+
+# ===== MISC =====
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file (TEKRAR - ÖNEMLİ)
 .env
+.env.test
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*

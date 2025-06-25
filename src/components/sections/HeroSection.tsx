@@ -16,7 +16,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ isVisible }) => {
     addToCart({
       id: 1,
       name: "NaturClean Meyve & Sebze Temizleme Tozu",
-      price: 400.00,
+      price: 799.00,
       image: "/calformat.webp",
     });
     

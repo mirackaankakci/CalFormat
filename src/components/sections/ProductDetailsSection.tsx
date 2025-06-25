@@ -5,7 +5,7 @@ import SectionTitle from '../ui/SectionTitle';
 const ProductDetailsSection: React.FC = () => {
   const usageSteps = [
     { step: 1, title: "Suya Karıştırın", desc: "1 litre suya 1 çay kaşığı CalFormat ekleyin", color: "from-blue-500 to-cyan-500" },
-    { step: 2, title: "Bekletin", desc: "Meyve ve sebzeleri 30 saniye bekletin", color: "from-purple-500 to-pink-500" },
+    { step: 2, title: "Bekletin", desc: "Meyve ve sebzeleri 2-3 dakika bekletin", color: "from-purple-500 to-pink-500" },
     { step: 3, title: "Durulayın", desc: "Temiz suyla durulayın ve servis edin", color: "from-green-500 to-emerald-500" }
   ];
 
