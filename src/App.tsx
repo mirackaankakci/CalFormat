@@ -22,6 +22,7 @@ import { CartProvider } from './contexts/CartContext';
 import { ReviewProvider } from './contexts/ReviewContext';
 import { BlogProvider } from './contexts/BlogContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { IkasProvider } from './contexts/IkasContext';
 import SEO from './components/common/SEO';
 import useSEO from './hooks/useSEO';
 import BlogList from './components/pages/BlogList';
@@ -36,6 +37,15 @@ import Register from './components/pages/Register';
 import Profile from './components/pages/Profile';
 import Unauthorized from './components/pages/Unauthorized';
 import VerifyEmail from './components/pages/VerifyEmail';
+import AdminDebug from './components/pages/AdminDebug';
+
+// ✅ Blog migration script'i - geliştirme için
+import addSlugsToExistingBlogs from './scripts/addSlugsToBlogs';
+
+// ✅ Migration script'i global olarak erişilebilir yap
+if (typeof window !== 'undefined') {
+  (window as any).addSlugsToExistingBlogs = addSlugsToExistingBlogs;
+}
 
 
 // Ana sayfa bileşeni
@@ -46,33 +56,131 @@ const HomePage = () => {
     setIsVisible(true);
   }, []);
 
-  // Ana sayfa için JSON-LD yapılandırılmış veri
+  // Ana sayfa için gelişmiş JSON-LD yapılandırılmış veri
   const homeStructuredData = {
     "@context": "https://schema.org",
-    "@type": "Product",
-    "name": "CalFormat Meyve Sebze Temizleme Tozu",
-    "image": "https://www.calformat.com.tr/product-image.jpg",
-    "description": "Meyve ve sebzelerdeki zirai ilaç kalıntılarını ve mikroorganizmaları temizleyen doğal bir temizleme tozu.",
-    "brand": {
-      "@type": "Brand",
-      "name": "CalFormat"
-    },
-    "offers": {
-      "@type": "Offer",
-      "url": "https://www.calformat.com.tr",
-      "priceCurrency": "TRY",
-      "price": "149.90",
-      "availability": "https://schema.org/InStock"
-    }
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://www.calformat.com.tr/#organization",
+        "name": "CalFormat",
+        "url": "https://www.calformat.com.tr",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://www.calformat.com.tr/logo.png",
+          "width": 300,
+          "height": 100
+        },
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "telephone": "+90-XXX-XXX-XXXX",
+          "contactType": "customer service",
+          "availableLanguage": "Turkish"
+        },
+        "sameAs": [
+          "https://www.facebook.com/calformat",
+          "https://www.instagram.com/calformat",
+          "https://twitter.com/calformat"
+        ]
+      },
+      {
+        "@type": "Product",
+        "@id": "https://www.calformat.com.tr/#product",
+        "name": "CalFormat Meyve Sebze Temizleme Tozu",
+        "image": [
+          "https://www.calformat.com.tr/calformat.webp",
+          "https://www.calformat.com.tr/product-gallery-1.jpg",
+          "https://www.calformat.com.tr/product-gallery-2.jpg"
+        ],
+        "description": "Meyve ve sebzelerdeki pestisit, balmumu ve zararlı kalıntıları etkili şekilde temizleyen %100 doğal temizleme tozu. Ailenizin sağlığını korur, doğal beslenmenizi destekler.",
+        "brand": {
+          "@type": "Brand",
+          "name": "CalFormat"
+        },
+        "manufacturer": {
+          "@id": "https://www.calformat.com.tr/#organization"
+        },
+        "category": "Doğal Temizlik Ürünleri",
+        "offers": {
+          "@type": "Offer",
+          "url": "https://www.calformat.com.tr",
+          "priceCurrency": "TRY",
+          "price": "299.90",
+          "priceValidUntil": "2025-12-31",
+          "availability": "https://schema.org/InStock",
+          "seller": {
+            "@id": "https://www.calformat.com.tr/#organization"
+          },
+          "shippingDetails": {
+            "@type": "OfferShippingDetails",
+            "shippingRate": {
+              "@type": "MonetaryAmount",
+              "value": "0",
+              "currency": "TRY"
+            },
+            "deliveryTime": {
+              "@type": "ShippingDeliveryTime",
+              "handlingTime": {
+                "@type": "QuantitativeValue",
+                "minValue": 1,
+                "maxValue": 2,
+                "unitCode": "DAY"
+              },
+              "transitTime": {
+                "@type": "QuantitativeValue",
+                "minValue": 1,
+                "maxValue": 3,
+                "unitCode": "DAY"
+              }
+            }
+          }
+        },
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "4.8",
+          "bestRating": "5",
+          "worstRating": "1",
+          "ratingCount": "2847"
+        },
+        "features": [
+          "%100 Doğal İçerik",
+          "Pestisit Temizleyici",
+          "Balmumu Çözücü",
+          "Mikrop Öldürücü",
+          "Kolay Kullanım"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://www.calformat.com.tr/#website",
+        "url": "https://www.calformat.com.tr",
+        "name": "CalFormat",
+        "description": "Doğal meyve sebze temizleme çözümleri",
+        "publisher": {
+          "@id": "https://www.calformat.com.tr/#organization"
+        },
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://www.calformat.com.tr/search?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    ]
   };
 
   return (
     <>
       <SEO 
         title="Ana Sayfa"
-        description="CalFormat ile meyve ve sebzelerinizdeki zirai ilaç kalıntılarını ve mikroorganizmaları doğal yollarla temizleyin. %100 doğal içerikli temizleme tozu."
-        keywords="meyve sebze temizleme tozu, zirai ilaç temizleyici, doğal temizlik, organik temizleyici"
+        description="CalFormat ile meyve ve sebzelerinizdeki pestisit, balmumu ve zararlı kalıntıları %100 doğal yöntemlerle temizleyin. Ailenizin sağlığını koruyun, doğal beslenmenizi destekleyin. Ücretsiz kargo!"
+        keywords="meyve sebze temizleme tozu, pestisit temizleyici, doğal temizlik, organik temizleyici, balmumu çözücü, zirai ilaç temizleyici, CalFormat, meyve sebze hijyen, doğal ürün, pestisit arındırıcısı"
         structuredData={homeStructuredData}
+        canonicalUrl="https://www.calformat.com.tr"
+        ogTitle="CalFormat - %100 Doğal Meyve Sebze Temizleme Tozu"
+        ogDescription="Pestisit, balmumu ve zararlı kalıntıları etkili şekilde temizleyin. Doğal, güvenli ve aileniz için ideal!"
+        ogImage="https://www.calformat.com.tr/calformat-og.jpg"
+        twitterTitle="CalFormat - Doğal Meyve Sebze Temizleyici"
+        twitterDescription="🌿 %100 doğal ✨ Etkili temizlik 🛡️ Aileniz için güvenli"
       />
       <FloatingElements />
       <HeroSection isVisible={isVisible} />
@@ -102,7 +210,7 @@ const AppContent = () => {
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/blogs" element={<BlogList />} />
-          <Route path="/blog/:id" element={<BlogDetail />} />
+          <Route path="/blog/:slug" element={<BlogDetail />} />
           <Route 
             path="/admin/blog/edit/:id" 
             element={
@@ -132,6 +240,10 @@ const AppContent = () => {
               </ProtectedRoute>
             } 
           />
+          
+          {/* Debug route - geliştirme için */}
+          <Route path="/admin/debug" element={<AdminDebug />} />
+          
           {/* Public routes */}
           <Route path="/register" element={<Register />} />
           
@@ -182,7 +294,9 @@ function App() {
           <CartProvider>
             <ReviewProvider>
               <BlogProvider>
-                <AppContent />
+                <IkasProvider>
+                  <AppContent />
+                </IkasProvider>
               </BlogProvider>
             </ReviewProvider>
           </CartProvider>

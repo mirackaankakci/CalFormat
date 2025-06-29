@@ -8,6 +8,7 @@ import {
   deleteDoc,
   query,
   orderBy,
+  where,
   serverTimestamp
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase'; // ✅ auth'u da import edin
@@ -16,6 +17,7 @@ import { uploadToGitHub, deleteFromGitHub } from './githubImageService';
 export interface Blog {
   id?: string;
   title: string;
+  slug: string; // ✅ URL slug alanı eklendi
   content: string;
   excerpt: string;
   author: string;
@@ -23,9 +25,25 @@ export interface Blog {
   tags: string[];
   image?: string;
   createdAt: any;
-  updatedAt: any;
-  published: boolean;
+  updatedAt: any;  published: boolean;
 }
+
+// ✅ Slug oluşturma fonksiyonu
+export const generateSlug = (title: string): string => {
+  return title
+    .toLowerCase()
+    .replace(/ğ/g, 'g')
+    .replace(/ç/g, 'c')
+    .replace(/ş/g, 's')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ü/g, 'u')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim()
+    .replace(/^-|-$/g, '');
+};
 
 // ✅ Admin kontrol fonksiyonunu ekleyin
 const checkAdminPermission = async (): Promise<boolean> => {
@@ -52,7 +70,7 @@ const checkAdminPermission = async (): Promise<boolean> => {
   }
 };
 
-export const addBlog = async (blogData: Omit<Blog, 'id' | 'createdAt' | 'updatedAt'>) => {
+export const addBlog = async (blogData: Omit<Blog, 'id' | 'createdAt' | 'updatedAt' | 'slug'>) => {
   // ✅ Admin kontrolü ekleyin
   const isAdmin = await checkAdminPermission();
   if (!isAdmin) {
@@ -62,14 +80,19 @@ export const addBlog = async (blogData: Omit<Blog, 'id' | 'createdAt' | 'updated
   try {
     console.log('Blog ekleniyor:', blogData);
     
+    // ✅ Slug otomatik oluştur
+    const slug = generateSlug(blogData.title);
+    console.log('Oluşturulan slug:', slug);
+    
     const docRef = await addDoc(collection(db, 'blogs'), {
       ...blogData,
+      slug, // ✅ Slug'ı da ekle
       authorId: auth.currentUser?.uid, // ✅ Yazar ID'si ekleyin
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
     
-    console.log('Blog başarıyla eklendi, ID:', docRef.id);
+    console.log('Blog başarıyla eklendi, ID:', docRef.id, 'Slug:', slug);
     return docRef.id;
   } catch (error) {
     console.error('Blog ekleme hatası:', error);
@@ -125,6 +148,42 @@ export const getBlog = async (id: string): Promise<Blog | null> => {
   }
 };
 
+// ✅ Slug'a göre blog bulma fonksiyonu
+export const getBlogBySlug = async (slug: string): Promise<Blog | null> => {
+  try {
+    console.log('Blog slug ile aranıyor:', slug);
+    
+    const q = query(
+      collection(db, 'blogs'),
+      where('slug', '==', slug)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      console.log('Blog bulunamadı:', slug);
+      return null;
+    }
+    
+    const doc = querySnapshot.docs[0];
+    const blogData = { id: doc.id, ...doc.data() } as Blog;
+    
+    // ✅ Yayınlanmamış blog için admin kontrolü
+    if (!blogData.published) {
+      const isAdmin = await checkAdminPermission();
+      if (!isAdmin) {
+        throw new Error('Bu blog\'a erişim yetkiniz yok');
+      }
+    }
+    
+    console.log('Blog slug ile bulundu:', blogData.title);
+    return blogData;
+  } catch (error) {
+    console.error('Blog slug ile getirme hatası:', error);
+    throw error;
+  }
+};
+
 export const updateBlog = async (id: string, blogData: Partial<Blog>) => {
   // ✅ Admin kontrolü ekleyin
   const isAdmin = await checkAdminPermission();
@@ -134,10 +193,19 @@ export const updateBlog = async (id: string, blogData: Partial<Blog>) => {
 
   try {
     const docRef = doc(db, 'blogs', id);
-    await updateDoc(docRef, {
+    
+    // ✅ Eğer title güncellendiyse slug'ı da güncelle
+    const updateData: any = {
       ...blogData,
       updatedAt: serverTimestamp()
-    });
+    };
+    
+    if (blogData.title) {
+      updateData.slug = generateSlug(blogData.title);
+      console.log('Yeni slug oluşturuldu:', updateData.slug);
+    }
+    
+    await updateDoc(docRef, updateData);
     console.log('Blog güncellendi:', id);
   } catch (error) {
     console.error('Blog güncelleme hatası:', error);

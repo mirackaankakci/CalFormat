@@ -9,4 +9,14 @@ export default defineConfig({
       '@': '/src',
     },
   },
+  server: {
+    proxy: {
+      // PHP dosyalarını proxy'le
+      '/api/php': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/php/, '')
+      }
+    }
+  }
 });

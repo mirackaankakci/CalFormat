@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Upload, Save, Loader2, X } from 'lucide-react';
-import { getBlog, updateBlog } from '../../services/blogService';
+import { getBlog, updateBlogWithImage } from '../../services/blogService';
 import { useBlog } from '../../contexts/BlogContext';
 
 const BlogEdit: React.FC = () => {
@@ -83,17 +83,7 @@ const BlogEdit: React.FC = () => {
 
     try {
       setLoading(true);
-      setError('');
-
-      console.log('Blog güncelleniyor...');
-
-      // Resim yükleme (varsa)
-      let imageUrl = currentImage;
-      if (imageFile) {
-        console.log('Yeni resim yükleniyor...');
-
-        console.log('Resim yüklendi:', imageUrl);
-      }
+      setError('');      console.log('Blog güncelleniyor...');
 
       // Tags'i array'e çevir
       const tagsArray = formData.tags
@@ -109,13 +99,17 @@ const BlogEdit: React.FC = () => {
         author: formData.author.trim(),
         category: formData.category,
         tags: tagsArray,
-        image: imageUrl,
         published: formData.published
-      };
-
-      // Blog'u güncelle
-      await updateBlog(id, blogData);
-      console.log('Blog güncellendi, ID:', id);
+      };      // ✅ Resimle birlikte blog'u güncelle
+      console.log('📝 Blog güncelleniyor:', {
+        id,
+        blogData,
+        hasImageFile: !!imageFile,
+        imageFileName: imageFile?.name
+      });
+      
+      await updateBlogWithImage(id, blogData, imageFile || undefined);
+      console.log('✅ Blog güncellendi, ID:', id);
 
       // Blog listesini yenile
       await refreshBlogs();

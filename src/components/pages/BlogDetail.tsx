@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Calendar, User, Tag, ArrowLeft, Share2, Loader2 } from 'lucide-react';
-import { Blog, getBlog } from '../../services/blogService';
+import { Blog, getBlogBySlug } from '../../services/blogService';
 import { sanitizeHTML } from '../../utils/security';
+import SEO from '../common/SEO';
 
 const BlogDetail: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const [blog, setBlog] = useState<Blog | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchBlog = async () => {
-      if (!id) {
-        setError('Blog ID bulunamadı');
+      if (!slug) {
+        setError('Blog slug bulunamadı');
         setLoading(false);
         return;
       }
@@ -22,8 +22,8 @@ const BlogDetail: React.FC = () => {
         setLoading(true);
         setError(null);
         
-        console.log('Blog getiriliyor, ID:', id);
-        const blogData = await getBlog(id);
+        console.log('Blog getiriliyor, slug:', slug);
+        const blogData = await getBlogBySlug(slug);
         
         if (blogData) {
           setBlog(blogData);
@@ -40,7 +40,7 @@ const BlogDetail: React.FC = () => {
     };
 
     fetchBlog();
-  }, [id]);
+  }, [slug]);
 
   // Tarih formatı
   const formatDate = (timestamp: any) => {
@@ -53,7 +53,6 @@ const BlogDetail: React.FC = () => {
       day: 'numeric'
     });
   };
-
   // Paylaşma fonksiyonu
   const handleShare = () => {
     if (navigator.share && blog) {
@@ -67,56 +66,157 @@ const BlogDetail: React.FC = () => {
       navigator.clipboard.writeText(window.location.href);
       alert('Blog linki kopyalandı!');
     }
+  };  // Blog için SEO verileri
+  const generateBlogSEO = () => {
+    if (!blog) return null;
+    
+    const currentUrl = `https://www.calformat.com.tr/blog/${blog.slug}`;
+    
+    // Blog içeriğinden düz metin çıkar (ilk 160 karakter)
+    const extractTextFromHTML = (html: string) => {
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      return div.textContent || div.innerText || '';
+    };
+
+    const metaDescription = blog.excerpt || 
+      extractTextFromHTML(blog.content).substring(0, 160) + '...';
+
+    // Anahtar kelimeler - blog tagları + genel anahtar kelimeler
+    const metaKeywords = [
+      ...blog.tags,
+      'CalFormat blog',
+      'meyve sebze temizleme',
+      'doğal temizlik',
+      blog.category
+    ].filter(Boolean).join(', ');
+
+    // JSON-LD structured data
+    const structuredData = {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": blog.title,
+      "description": metaDescription,
+      "image": blog.image || "https://www.calformat.com.tr/calformat.webp",
+      "author": {
+        "@type": "Person",
+        "name": blog.author || "CalFormat Editörü"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "CalFormat",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://www.calformat.com.tr/logo.png"
+        }
+      },
+      "datePublished": blog.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      "dateModified": blog.updatedAt?.toDate?.()?.toISOString() || blog.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": currentUrl
+      },
+      "keywords": metaKeywords,
+      "articleSection": blog.category,
+      "inLanguage": "tr-TR"
+    };
+
+    return {
+      title: blog.title,
+      description: metaDescription,
+      keywords: metaKeywords,
+      canonicalUrl: currentUrl,
+      ogTitle: blog.title,
+      ogDescription: metaDescription,
+      ogImage: blog.image || "https://www.calformat.com.tr/calformat.webp",
+      ogUrl: currentUrl,
+      twitterTitle: blog.title,
+      twitterDescription: metaDescription,
+      twitterImage: blog.image || "https://www.calformat.com.tr/calformat.webp",
+      structuredData
+    };
   };
 
+  const blogSEO = generateBlogSEO();
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50 py-12">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <Loader2 className="w-12 h-12 text-[#ee7f1a] animate-spin mx-auto mb-4" />
-              <p className="text-gray-600 text-lg">Blog yükleniyor...</p>
+      <>
+        <SEO 
+          title="Blog Yükleniyor"
+          description="CalFormat blog yazısı yükleniyor..."
+          noIndex={true}
+        />
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50 py-12">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="text-center">
+                <Loader2 className="w-12 h-12 text-[#ee7f1a] animate-spin mx-auto mb-4" />
+                <p className="text-gray-600 text-lg">Blog yükleniyor...</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
-
   if (error || !blog) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50 py-12">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-8">
-            <Link
-              to="/blogs"
-              className="inline-flex items-center gap-2 text-[#ee7f1a] font-medium hover:text-[#d62d27] transition-colors duration-300"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Blog Listesine Dön
-            </Link>
-          </div>
-          <div className="text-center py-16">
-            <div className="bg-white rounded-3xl shadow-lg p-12 max-w-md mx-auto">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Blog Bulunamadı</h3>
-              <p className="text-gray-600 mb-6">{error || 'Aradığınız blog mevcut değil.'}</p>
+      <>
+        <SEO 
+          title="Blog Bulunamadı"
+          description="Aradığınız blog yazısı bulunamadı."
+          noIndex={true}
+        />
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50 py-12">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mb-8">
               <Link
                 to="/blogs"
-                className="bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] text-white px-6 py-3 rounded-xl hover:from-[#d62d27] hover:to-[#ee7f1a] transition-all duration-300 font-semibold"
+                className="inline-flex items-center gap-2 text-[#ee7f1a] font-medium hover:text-[#d62d27] transition-colors duration-300"
               >
+                <ArrowLeft className="w-5 h-5" />
                 Blog Listesine Dön
               </Link>
             </div>
+            <div className="text-center py-16">
+              <div className="bg-white rounded-3xl shadow-lg p-12 max-w-md mx-auto">
+                <h3 className="text-xl font-bold text-gray-900 mb-3">Blog Bulunamadı</h3>
+                <p className="text-gray-600 mb-6">{error || 'Aradığınız blog mevcut değil.'}</p>
+                <Link
+                  to="/blogs"
+                  className="bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] text-white px-6 py-3 rounded-xl hover:from-[#d62d27] hover:to-[#ee7f1a] transition-all duration-300 font-semibold"
+                >
+                  Blog Listesine Dön
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50 py-12">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <>
+      {/* ✅ Dinamik SEO */}
+      {blogSEO && (
+        <SEO 
+          title={blogSEO.title}
+          description={blogSEO.description}
+          keywords={blogSEO.keywords}
+          canonicalUrl={blogSEO.canonicalUrl}
+          ogTitle={blogSEO.ogTitle}
+          ogDescription={blogSEO.ogDescription}
+          ogImage={blogSEO.ogImage}
+          ogUrl={blogSEO.ogUrl}
+          twitterTitle={blogSEO.twitterTitle}
+          twitterDescription={blogSEO.twitterDescription}
+          twitterImage={blogSEO.twitterImage}
+          structuredData={blogSEO.structuredData}
+        />
+      )}
+      
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50 py-12">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Geri Dön */}
         <div className="mb-8">
           <Link
@@ -216,12 +316,12 @@ const BlogDetail: React.FC = () => {
                 className="bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] text-white px-6 py-3 rounded-xl hover:from-[#d62d27] hover:to-[#ee7f1a] transition-all duration-300 transform hover:scale-105 font-semibold inline-block"
               >
                 Ürünü İncele
-              </Link>
-            </div>
+              </Link>            </div>
           </div>
         </article>
       </div>
     </div>
+    </>
   );
 };
 

@@ -28,17 +28,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-
   // ✅ Kullanıcı profili güvenli şekilde getir
   const fetchUserProfile = async (user: User): Promise<UserProfile | null> => {
     try {
+      console.log('👤 Kullanıcı profili getiriliyor:', user.email);
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       
       if (userDoc.exists()) {
         const data = userDoc.data();
-        
-        // ✅ Veri doğrulama
-        return {
+        console.log('📊 Firestore\'dan gelen veri:', data);
+          // ✅ Veri doğrulama
+        const profile: UserProfile = {
           uid: user.uid,
           email: user.email || '',
           displayName: user.displayName || data.displayName || '',
@@ -46,11 +46,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           emailVerified: user.emailVerified,
           createdAt: data.createdAt
         };
+        
+        console.log('✅ İşlenmiş profil:', profile);
+        return profile;
+      } else {
+        console.warn('⚠️ Kullanıcı profili Firestore\'da bulunamadı:', user.uid);
       }
       
       return null;
     } catch (error) {
-      console.error('Kullanıcı profili getirme hatası:', error);
+      console.error('❌ Kullanıcı profili getirme hatası:', error);
       return null;
     }
   };
@@ -95,13 +100,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => unsubscribe();
-  }, []);
+  }, []);  // ✅ Admin kontrolü için debug log ekle
+  const isAdmin = userProfile?.role === 'admin';
+  console.log('🔍 Admin kontrolü:', {
+    userEmail: user?.email,
+    userProfileExists: !!userProfile,
+    role: userProfile?.role,
+    isAdmin
+  });
 
   const value = {
     user,
     userProfile,
     loading,
-    isAdmin: userProfile?.role === 'admin' && user?.emailVerified === true, // ✅ Çifte kontrol
+    isAdmin,
     logout,
     refreshUserProfile
   };

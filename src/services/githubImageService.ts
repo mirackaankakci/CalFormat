@@ -1,10 +1,16 @@
 // services/githubImageService.ts - GÜVENLİ VERSİYON
-
+const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN || "";
+const GITHUB_REPO = import.meta.env.VITE_GITHUB_REPO || "";
+const GITHUB_BRANCH = 'main';
 
 // Token kontrolü ekleyin
 if (!GITHUB_TOKEN || !GITHUB_REPO) {
-  console.error('GitHub konfigürasyonu eksik!');
-  throw new Error('GitHub ayarları yapılandırılmamış');
+  console.error('❌ GitHub konfigürasyonu eksik!', {
+    hasToken: !!GITHUB_TOKEN,
+    tokenLength: GITHUB_TOKEN?.length,
+    repo: GITHUB_REPO
+  });
+  console.warn('GitHub konfigürasyonu eksik! .env dosyasını kontrol edin');
 }
 
 export interface GitHubUploadResponse {
@@ -137,10 +143,11 @@ export const uploadToGitHub = async (file: File): Promise<string> => {
         throw new Error('Dosya zaten mevcut veya geçersiz');
       }
       
-      throw new Error(`GitHub upload hatası: ${response.status}`);
-    }
+      throw new Error(`GitHub upload hatası: ${response.status}`);    }
 
     const data = await response.json();
+    console.log('✅ GitHub API Response:', data.name || 'Upload successful');
+    
     const cdnUrl = `https://cdn.jsdelivr.net/gh/${GITHUB_REPO}@${GITHUB_BRANCH}/${filePath}`;
     
     console.log('Güvenli GitHub upload başarılı:', cdnUrl);

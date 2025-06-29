@@ -5,6 +5,7 @@ import { useBlog } from '../../contexts/BlogContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { deleteBlog } from '../../services/blogService';
 import { sanitizeHTML } from '../../utils/security';
+import SEO from '../common/SEO';
 
 const BlogList: React.FC = () => {
   const { blogs, loading, error, refreshBlogs } = useBlog();
@@ -82,12 +83,62 @@ const BlogList: React.FC = () => {
           </div>
         </div>
       </div>
-    );
-  }
+    );  }
+
+  // Blog listesi için SEO verileri
+  const blogListSEO = {
+    title: "Blog Yazıları",
+    description: "CalFormat blog sayfasında sağlıklı yaşam, doğal beslenme ve meyve-sebze temizliği hakkında uzman görüşleri ve faydalı bilgiler bulabilirsiniz.",
+    keywords: "CalFormat blog, sağlıklı yaşam, doğal beslenme, meyve sebze temizliği, pestisit temizleme, doğal temizlik yöntemleri, organik yaşam",
+    canonicalUrl: "https://www.calformat.com.tr/blogs",
+    ogTitle: "CalFormat Blog - Sağlıklı Yaşam Rehberi",
+    ogDescription: "Uzman yazarlarımızdan sağlıklı yaşam, doğal beslenme ve meyve-sebze temizliği konularında faydalı bilgiler.",
+    ogImage: "https://www.calformat.com.tr/blog-og.jpg",
+    structuredData: {
+      "@context": "https://schema.org",
+      "@type": "Blog",
+      "name": "CalFormat Blog",
+      "description": "Sağlıklı yaşam ve doğal beslenme blog yazıları",
+      "url": "https://www.calformat.com.tr/blogs",
+      "publisher": {
+        "@type": "Organization",
+        "name": "CalFormat",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://www.calformat.com.tr/logo.png"
+        }
+      },
+      "blogPost": blogs.filter(blog => blog.published).map(blog => ({
+        "@type": "BlogPosting",
+        "headline": blog.title,
+        "description": blog.excerpt,
+        "url": `https://www.calformat.com.tr/blog/${blog.slug}`,
+        "author": {
+          "@type": "Person",
+          "name": blog.author || "CalFormat Editörü"
+        },
+        "datePublished": blog.createdAt?.toDate?.()?.toISOString(),
+        "image": blog.image || "https://www.calformat.com.tr/calformat.webp"
+      }))
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50 py-12">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <>
+      <SEO 
+        title={blogListSEO.title}
+        description={blogListSEO.description}
+        keywords={blogListSEO.keywords}
+        canonicalUrl={blogListSEO.canonicalUrl}
+        ogTitle={blogListSEO.ogTitle}
+        ogDescription={blogListSEO.ogDescription}
+        ogImage={blogListSEO.ogImage}
+        ogUrl={blogListSEO.canonicalUrl}
+        structuredData={blogListSEO.structuredData}
+      />
+      
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-yellow-50 py-12">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-16">
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
@@ -198,10 +249,9 @@ const BlogList: React.FC = () => {
                     )}
 
                     {/* Blog Aksiyonları */}
-                    <div className="flex items-center justify-between">
-                      {/* Devamını Oku */}
+                    <div className="flex items-center justify-between">                      {/* Devamını Oku */}
                       <Link
-                        to={`/blog/${blog.id}`}
+                        to={`/blog/${blog.slug}`}
                         className="inline-flex items-center gap-2 text-[#ee7f1a] font-semibold hover:text-[#d62d27] transition-colors duration-300 group/link"
                       >
                         Devamını Oku
@@ -250,12 +300,12 @@ const BlogList: React.FC = () => {
                 >
                   Yeni Blog Ekle
                 </Link>
-              </div>
-            )}
+              </div>            )}
           </>
         )}
       </div>
     </div>
+    </>
   );
 };
 

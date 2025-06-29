@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, ChevronDown, Shield, Plus, Users, FileText, LogOut, User } from 'lucide-react';
+import { ShoppingCart, ChevronDown, Shield, Plus, Users, FileText, LogOut, User, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -70,15 +70,22 @@ const Header: React.FC = () => {
                     >
                       <FileText className="w-4 h-4" />
                       <span>Blog Yönetimi</span>
-                    </Link>
-
-                    {/* Kullanıcı Yönetimi */}
+                    </Link>                    {/* Kullanıcı Yönetimi */}
                     <Link
                       to="/admin/users"
                       className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-[#ee7f1a] transition-colors duration-300"
                     >
                       <Users className="w-4 h-4" />
                       <span>Kullanıcı Yönetimi</span>
+                    </Link>
+
+                    {/* Debug Panel */}
+                    <Link
+                      to="/admin/debug"
+                      className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-[#ee7f1a] transition-colors duration-300"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>Debug Panel</span>
                     </Link>
                   </div>
                 </div>
