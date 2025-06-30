@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Truck, Shield, Check, User, MapPin, Phone, Mail } from 'lucide-react';
+import { ArrowLeft, CreditCard, Truck, Shield, Check, User, MapPin, Phone, Mail, Loader2 } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 
 const Checkout: React.FC = () => {
-  const { items } = useCart();
+  const { items, createOrder } = useCart();
   const [activeStep, setActiveStep] = useState<'bilgiler' | 'odeme' | 'onay'>('bilgiler');
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  const [orderData, setOrderData] = useState<any>(null);
   const [formData, setFormData] = useState({
     ad: '',
     soyad: '',
@@ -33,9 +36,36 @@ const Checkout: React.FC = () => {
     }));
   };
 
-  const handleNextStep = () => {
-    if (activeStep === 'bilgiler') setActiveStep('odeme');
-    else if (activeStep === 'odeme') setActiveStep('onay');
+  const handleNextStep = async () => {
+    if (activeStep === 'bilgiler') {
+      setActiveStep('odeme');
+    } else if (activeStep === 'odeme') {
+      // Ödeme adımından sonra sipariş oluştur
+      setIsCreatingOrder(true);
+      setOrderError(null);
+      
+      try {
+        const orderInfo = {
+          firstName: formData.ad,
+          lastName: formData.soyad,
+          email: formData.email,
+          phone: formData.telefon,
+          address: formData.adres,
+          city: formData.sehir,
+          district: formData.ilce,
+          postalCode: formData.postaKodu
+        };
+
+        const result = await createOrder(orderInfo);
+        setOrderData(result);
+        setActiveStep('onay');
+      } catch (error) {
+        console.error('Sipariş oluşturma hatası:', error);
+        setOrderError(error instanceof Error ? error.message : 'Sipariş oluşturulamadı');
+      } finally {
+        setIsCreatingOrder(false);
+      }
+    }
   };
 
   const handlePrevStep = () => {
@@ -337,13 +367,29 @@ const Checkout: React.FC = () => {
                     
                     <button 
                       onClick={handleNextStep}
-                      disabled={!isFormValid()}
-                      className={`px-8 py-3 rounded-full font-medium text-white flex items-center gap-2 ${isFormValid() ? 'bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] hover:shadow-lg transform hover:scale-105 transition-all duration-300' : 'bg-gray-300 cursor-not-allowed'}`}
+                      disabled={!isFormValid() || isCreatingOrder}
+                      className={`px-8 py-3 rounded-full font-medium text-white flex items-center gap-2 ${isFormValid() && !isCreatingOrder ? 'bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] hover:shadow-lg transform hover:scale-105 transition-all duration-300' : 'bg-gray-300 cursor-not-allowed'}`}
                     >
-                      Siparişi Tamamla
-                      <ArrowLeft className="w-4 h-4 rotate-180" />
+                      {isCreatingOrder ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Sipariş Oluşturuluyor...
+                        </>
+                      ) : (
+                        <>
+                          Siparişi Tamamla
+                          <ArrowLeft className="w-4 h-4 rotate-180" />
+                        </>
+                      )}
                     </button>
                   </div>
+                  
+                  {/* Hata mesajı */}
+                  {orderError && (
+                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+                      <p className="text-red-600 text-sm">{orderError}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -363,11 +409,22 @@ const Checkout: React.FC = () => {
                     <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 mb-8 w-full max-w-md">
                       <div className="flex justify-between items-center mb-3">
                         <span className="text-gray-600">Sipariş Numarası:</span>
-                        <span className="font-medium">#CAL{Math.floor(Math.random() * 100000)}</span>
+                        <span className="font-medium">
+                          {orderData?.data?.createOrder?.id ? 
+                            `#${orderData.data.createOrder.id.slice(-8)}` : 
+                            `#CAL${Math.floor(Math.random() * 100000)}`
+                          }
+                        </span>
                       </div>
                       <div className="flex justify-between items-center mb-3">
                         <span className="text-gray-600">Tarih:</span>
-                        <span className="font-medium">{new Date().toLocaleDateString()}</span>
+                        <span className="font-medium">{orderData?.timestamp || new Date().toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-gray-600">Durum:</span>
+                        <span className="font-medium text-green-600">
+                          {orderData?.data?.createOrder?.status || 'Onaylandı'}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Toplam:</span>

@@ -39,6 +39,7 @@ interface Product {
   discount?: number;
   stock?: number;
   brand?: string;
+  variants?: Array<{id: string}>;
 }
 
 const CTASection: React.FC = () => {
@@ -55,6 +56,7 @@ const CTASection: React.FC = () => {
       name: product.name,
       price: product.price,
       image: product.image,
+      variantId: product.variants?.[0]?.id || "7868c357-4726-432a-ad5d-49619e6a508b" // Fallback variant ID
     });
     
     // Basit bildirim

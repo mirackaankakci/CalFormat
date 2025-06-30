@@ -33,6 +33,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ isVisible }) => {
       name: product.name,
       price: product.price,
       image: product.image,
+      variantId: firstProduct?.variants?.[0]?.id || "7868c357-4726-432a-ad5d-49619e6a508b" // Fallback variant ID
     });
     
     // Sepet sayfasına yönlendir

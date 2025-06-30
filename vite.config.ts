@@ -16,6 +16,12 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/php/, '')
+      },
+      // Public PHP dosyaları için
+      '/public/*.php': {
+        target: 'http://localhost:8080/public',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/public/, '')
       }
     }
   }
