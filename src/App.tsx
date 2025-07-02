@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 import Header from './components/layout/Header';
@@ -38,6 +38,7 @@ import Profile from './components/pages/Profile';
 import Unauthorized from './components/pages/Unauthorized';
 import VerifyEmail from './components/pages/VerifyEmail';
 import AdminDebug from './components/pages/AdminDebug';
+import { useSiPayCallback } from './hooks/useSiPayCallback';
 
 // ✅ Blog migration script'i - geliştirme için
 import addSlugsToExistingBlogs from './scripts/addSlugsToBlogs';
@@ -296,6 +297,7 @@ function App() {
               <BlogProvider>
                 <IkasProvider>
                   <AppContent />
+                  <SiPayCallbackHandler />
                 </IkasProvider>
               </BlogProvider>
             </ReviewProvider>
@@ -305,5 +307,11 @@ function App() {
     </AuthProvider>
   );
 }
+
+// SiPay callback handler bileşeni
+const SiPayCallbackHandler = () => {
+  useSiPayCallback();
+  return null;
+};
 
 export default App;

@@ -14,10 +14,48 @@ export interface OrderData {
   lastName: string;
   email: string;
   phone: string;
-  address: string;
-  city: string;
-  district: string;
-  postalCode: string;
+  
+  // Teslimat Adresi
+  shippingAddress: string;
+  shippingAddressLine2?: string;
+  shippingCity: string;
+  shippingDistrict: string;
+  shippingTown?: string;
+  shippingPostalCode: string;
+  shippingCityId?: string;
+  shippingDistrictId?: string;
+  shippingTownId?: string;
+  
+  // Fatura Adresi
+  billingAddress: string;
+  billingAddressLine2?: string;
+  billingCity: string;
+  billingDistrict: string;
+  billingPostalCode: string;
+  billingCityId?: string;
+  billingDistrictId?: string;
+  
+  // Kurumsal Bilgiler
+  isCompany: boolean;
+  companyName?: string;
+  taxNumber?: string;
+  taxOffice?: string;
+  
+  // Flags
+  isDifferentBillingAddress: boolean;
+}
+
+export interface OrderResult {
+  success: boolean;
+  orderId?: string;
+  message?: string;
+  data?: any;
+  orderSummary?: {
+    subtotal: number;
+    shipping: number;
+    total: number;
+    items: CartItem[];
+  };
 }
 
 interface CartContextType {
@@ -26,7 +64,7 @@ interface CartContextType {
   updateQuantity: (id: number, change: number) => void;
   removeItem: (id: number) => void;
   clearCart: () => void;
-  createOrder: (orderData: OrderData) => Promise<any>;
+  createOrder: (orderData: OrderData) => Promise<OrderResult>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -70,55 +108,84 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setItems([]);
   };
 
-  const createOrder = async (orderData: OrderData): Promise<any> => {
+  const createOrder = async (orderData: OrderData): Promise<OrderResult> => {
     try {
-      const orderLineItems = items.map(item => ({
-        id: item.variantId || `variant-${item.id}`, // Gerçek variant ID veya fallback
-        price: item.price * 100, // Kuruş cinsinden
-        variant: {
-          id: item.variantId || `7868c357-4726-432a-ad5d-49619e6a508b` // Fallback variant ID
-        },
-        quantity: item.quantity
-      }));
+      console.log('🛍️ Sipariş oluşturuluyor...', { orderData, items });
+
+      // Sepet boş mu kontrol et
+      if (items.length === 0) {
+        throw new Error('Sepetiniz boş');
+      }
 
       const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const shipping = total > 150 ? 0 : 29.90;
       const finalTotal = total + shipping;
 
-      const payload = {
+      // Sipariş payload'ını hazırla
+      const orderPayload = {
         input: {
           order: {
-            orderLineItems,
+            orderLineItems: items.map(item => ({
+              id: item.variantId || "8c64cc8a-7950-49e3-8739-36bcfc1db7fa", // Varsayılan ürün ID
+              price: Math.round(item.price * 100), // Kuruş cinsinden (799.00 -> 79900)
+              variant: {
+                id: item.variantId || "7868c357-4726-432a-ad5d-49619e6a508b" // Varsayılan variant ID
+              },
+              quantity: item.quantity
+            })),
             billingAddress: {
-              addressLine1: orderData.address,
+              addressLine1: orderData.isDifferentBillingAddress ? orderData.billingAddress : orderData.shippingAddress,
+              addressLine2: orderData.isDifferentBillingAddress ? (orderData.billingAddressLine2 || null) : (orderData.shippingAddressLine2 || null),
               city: {
-                name: orderData.city
+                name: orderData.isDifferentBillingAddress ? orderData.billingCity : orderData.shippingCity
               },
               country: {
-                name: "Türkiye"
+                name: "Türkiye",
+                id: "da8c5f2a-8d37-48a8-beff-6ab3793a1861",
+                code: null
               },
               firstName: orderData.firstName,
               lastName: orderData.lastName,
-              isDefault: false
+              isDefault: false,
+              company: orderData.isCompany ? orderData.companyName : null,
+              district: {
+                name: orderData.isDifferentBillingAddress ? orderData.billingDistrict : orderData.shippingDistrict,
+                id: orderData.isDifferentBillingAddress ? (orderData.billingDistrictId || null) : (orderData.shippingDistrictId || null)
+              },
+              state: {
+                name: "Default",
+                id: "dcb9135c-4b84-4c06-9a42-f359317a9b78",
+                code: null
+              },
+              taxOffice: orderData.isCompany ? orderData.taxOffice : null,
+              taxNumber: orderData.isCompany ? orderData.taxNumber : null,
+              postalCode: orderData.isDifferentBillingAddress ? orderData.billingPostalCode : orderData.shippingPostalCode,
+              phone: null
             },
             shippingAddress: {
               city: {
-                name: orderData.city
+                name: orderData.shippingCity || "İstanbul"
               },
-              addressLine1: orderData.address,
+              addressLine1: orderData.shippingAddress,
+              addressLine2: orderData.shippingAddressLine2 || null,
               country: {
+                id:"da8c5f2a-8d37-48a8-beff-6ab3793a1861",
                 name: "Türkiye"
               },
               firstName: orderData.firstName,
-              lastName: orderData.lastName,
-              phone: orderData.phone,
               isDefault: false,
+              lastName: orderData.lastName,
+              phone: orderData.phone || null,
               state: {
-                name: "Türkiye"
+                name: "Default"
               },
               district: {
-                name: orderData.district || null
-              }
+                name: orderData.shippingDistrict || "Kadıköy"
+              },
+              company: orderData.isCompany ? orderData.companyName : null,
+              taxNumber: orderData.isCompany ? orderData.taxNumber : null,
+              taxOffice: orderData.isCompany ? orderData.taxOffice : null,
+              postalCode: orderData.shippingPostalCode || null
             },
             note: null,
             deleted: false,
@@ -126,105 +193,71 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               lastName: orderData.lastName,
               firstName: orderData.firstName,
               email: orderData.email
-            }
+            },
+            currencyCode: null
           },
           transactions: [
             {
-              amount: Math.round(finalTotal * 100) // Kuruş cinsinden toplam tutar
+              amount: Math.round(finalTotal * 100) // Kuruş cinsinden
             }
           ]
         }
       };
 
-      console.log('Sipariş gönderiliyor:', payload);
-
-      // Development mode'da mock yanıt dön (test için)
-      if (import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_API) {
-        console.log('🔧 Development mode: Mock sipariş oluşturuluyor...');
-        
-        // 2 saniye simülasyon beklemesi
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        const mockResult = {
-          success: true,
-          data: {
-            createOrder: {
-              id: `mock-order-${Date.now()}`,
-              status: 'created'
-            }
-          },
-          timestamp: new Date().toISOString()
-        };
-
-        console.log('✅ Mock sipariş başarılı:', mockResult);
-        
-        // Başarılı sipariş sonrası sepeti temizle
-        clearCart();
-        
-        return mockResult;
-      }
+      console.log('📦 Sipariş payload:', orderPayload);
 
       // Gerçek API çağrısı
-      const possibleUrls = [
-        'http://localhost/CallFormat/public/ikas_create_order.php',
-        'http://localhost/CalFormat/public/ikas_create_order.php',
-        'http://localhost:8080/public/ikas_create_order.php',
-        '/public/ikas_create_order.php'
-      ];
-
-      let response: Response | null = null;
-      let lastError: Error | null = null;
-
-      for (const url of possibleUrls) {
-        try {
-          console.log(`Trying URL: ${url}`);
-          response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-          });
-
-          if (response.ok) {
-            console.log(`Success with URL: ${url}`);
-            break;
-          } else {
-            console.log(`Failed with URL: ${url}, status: ${response.status}`);
-          }
-        } catch (error) {
-          console.log(`Error with URL: ${url}`, error);
-          lastError = error as Error;
-          response = null;
-        }
-      }
-
-      if (!response) {
-        throw new Error(`API'ye ulaşılamıyor. PHP server çalışıyor mu? Son hata: ${lastError?.message}`);
-      }
-
-      console.log('API Response status:', response.status);
+      console.log('🌐 API çağrısı yapılıyor...');
+      console.log('📦 Gönderilen payload:', JSON.stringify(orderPayload, null, 2));
       
+      const response = await fetch('/ikas_create_order.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderPayload)
+      });
+
+      console.log('📊 Response status:', response.status);
+      console.log('📊 Response headers:', response.headers);
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        console.error('❌ API Error Response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('API Result:', result);
+      console.log('📄 API yanıtı:', result);
 
       if (!result.success) {
         throw new Error(result.message || 'Sipariş oluşturulamadı');
       }
 
-      // Başarılı sipariş sonrası sepeti temizle
-      clearCart();
+      // Başarılı sipariş
+      const orderSummary = {
+        subtotal: total,
+        shipping: shipping,
+        total: finalTotal,
+        items: [...items] // Sepet temizlenmeden önce kopyalayalım
+      };
       
-      return result;
+      clearCart();
+      return {
+        success: true,
+        orderId: result.data?.createOrderWithTransactions?.id || result.data?.createOrder?.id || `ORDER-${Date.now()}`,
+        message: 'Sipariş başarıyla oluşturuldu',
+        data: result.data,
+        orderSummary
+      };
+
     } catch (error) {
-      console.error('Sipariş oluşturma hatası:', error);
-      throw error;
+      console.error('❌ Sipariş oluşturma hatası:', error);
+      
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu'
+      };
     }
   };
 

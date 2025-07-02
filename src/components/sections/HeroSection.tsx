@@ -12,7 +12,7 @@ interface HeroSectionProps {
 const HeroSection: React.FC<HeroSectionProps> = ({ isVisible }) => {
   const { addToCart } = useCart();
   const navigate = useNavigate();
-  const { firstProduct, loading } = useIkas();
+  const { firstProduct } = useIkas();
   // ✅ API'den gelen ilk ürün varsa onu kullan, yoksa fallback
   const product = firstProduct || {
     id: 1,
@@ -33,7 +33,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ isVisible }) => {
       name: product.name,
       price: product.price,
       image: product.image,
-      variantId: firstProduct?.variants?.[0]?.id || "7868c357-4726-432a-ad5d-49619e6a508b" // Fallback variant ID
+      variantId: "7868c357-4726-432a-ad5d-49619e6a508b" // Varsayılan variant ID
     });
     
     // Sepet sayfasına yönlendir

@@ -64,7 +64,7 @@ export const IkasProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log('🔄 PHP API\'den ürünler getiriliyor...');
       
-      const response = await fetch('http://localhost:8080/ikas_products.php', {
+      const response = await fetch('/ikas_products.php', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
