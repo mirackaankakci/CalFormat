@@ -1,0 +1,113 @@
+# SiPay 3D ödeme için CSP ayarları - TAMAMEN KALDIR
+Header always unset Content-Security-Policy
+Header always unset X-Content-Security-Policy  
+Header always unset X-WebKit-CSP
+Header always unset X-Frame-Options
+Header always unset Strict-Transport-Security
+Header always unset X-XSS-Protection
+Header always unset X-Content-Type-Options
+Header always unset Referrer-Policy
+
+# SiPay için güvenlik header'larını esnetle
+Header always set X-Frame-Options "ALLOWALL"
+
+# Meta refresh ve form-action için izin ver
+Header always set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *; img-src 'self' data: *; connect-src 'self' *; form-action 'self' *; frame-src 'self' *; object-src 'none';"
+
+# CORS ayarları
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+Header always set Access-Control-Allow-Headers "Origin, Content-Type, Accept, Authorization, X-Request-With"
+Header always set Access-Control-Allow-Credentials "true"
+
+# Content-Type ayarları
+<Files "*.php">
+    Header always set Content-Type "application/json; charset=utf-8"
+</Files>
+
+# Compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+</IfModule>
+
+# Security headers (SiPay için esnek)
+# Header always set X-Frame-Options "SAMEORIGIN"
+# Header always set X-Content-Type-Options "nosniff"
+# Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+# Cache control
+<IfModule mod_expires.c>
+    ExpiresActive on
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+</IfModule>
+
+# ===== GÜVENLİK KURALLARI =====
+# .env dosyasına erişimi engelle - KRİTİK GÜVENLİK
+<Files ".env">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# Hassas dosyalara erişimi engelle
+<FilesMatch "\.(env|log|sql|bak|backup|conf|config|ini)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Hidden dosyalara erişimi engelle (. ile başlayan)
+<FilesMatch "^\.">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Güvenlik ve debug log dosyalarını koru
+<Files "security.log">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+<Files "debug.log">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+<Files "sipay_debug.log">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# Backup ve geçici dosyaları koru
+<FilesMatch "\.(bak|backup|old|tmp|temp|swp|swo|~)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Tehlikeli dosya uzantılarını engelle
+<FilesMatch "\.(sh|bat|exe|com|scr|pif|vbs|js|jar)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Directory listing'i kapat
+Options -Indexes
+
+# Server bilgilerini gizle
+ServerTokens Prod
+ServerSignature Off
+
+# ===== SİPAY İÇİN CSP AYARLARI =====

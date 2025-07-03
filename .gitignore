@@ -25,10 +25,14 @@ config/keys.js
 public/*.log
 logs/
 
-# Debug dosyaları
-debug*.php
-*debug.php
+# Debug dosyaları - sadece gerçek debug dosyaları
+debug_config.php
+debug_token.php
+graphql_debug.php
 simple_token_decode.php
+security_test.php
+test.php
+test_districts.php
 
 # ===== FIREBASE =====
 .firebase/
@@ -109,7 +113,8 @@ coverage/
 
 # Gatsby cache
 .cache/
-public
+# public klasörü Gatsby build output'u için ignore edilir, bizim projeye dahil etmiyoruz
+# public
 
 # ===== STORYBOOK =====
 storybook-static
@@ -162,11 +167,10 @@ pids
 !.env.example
 !public/server_env_template
 
-# Configuration files
-config.php
-config.json
-settings.php
-settings.json
+# Configuration files - sadece hassas config dosyaları
+# config.php ve settings.php artık ignore edilmiyor - production'da gerekli
+# config.json
+# settings.json
 
 # Log files
 *.log
