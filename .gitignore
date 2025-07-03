@@ -8,12 +8,27 @@
 .env.production.local
 .env.backup
 
+# Public dizinindeki .env dosyası
+public/.env
+public/.env.*
+!public/server_env_template
+
 # API Keys & Secrets
 *.key
 *.pem
 .secrets/
 config/secrets.js
 config/keys.js
+
+# Log dosyaları
+*.log
+public/*.log
+logs/
+
+# Debug dosyaları
+debug*.php
+*debug.php
+simple_token_decode.php
 
 # ===== FIREBASE =====
 .firebase/
@@ -140,3 +155,52 @@ pids
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# ===== KRİTİK GÜVENLİK DOSYALARI =====
+# Environment variables
+.env*
+!.env.example
+!public/server_env_template
+
+# Configuration files
+config.php
+config.json
+settings.php
+settings.json
+
+# Log files
+*.log
+logs/
+security.log
+debug.log
+sipay_debug.log
+error.log
+access.log
+
+# Database files
+*.db
+*.sqlite
+*.sql
+*.mdb
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.tmp
+*.temp
+
+# Certificates and keys
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+
+# PHP temporary files
+*.php~
+*.php.bak
+
+# Composer auth
+auth.json

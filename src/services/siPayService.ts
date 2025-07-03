@@ -82,6 +82,7 @@ export interface SiPay2DPaymentResponse {
   error?: string;
   message?: string;
   test_mode?: boolean;
+  timestamp?: string;
 }
 
 export interface SiPayTokenResponse {
@@ -106,29 +107,6 @@ export interface SiPayPaymentResponse {
   form_data?: any;
   error?: string;
   message?: string;
-}
-
-// 2D (Non-Secure) ödeme yanıtı
-export interface SiPay2DPaymentResponse {
-  success: boolean;
-  data?: {
-    payment_status: number; // 1 = başarılı, 0 = başarısız
-    transaction_type: string; // Auth, PreAuth
-    order_id: string;
-    invoice_id: string;
-    total: number;
-    currency_code: string;
-    sipay_status: number;
-    status_description: string;
-    hash_key?: string;
-    merchant_commission?: number;
-    user_commission?: number;
-    transaction_date?: string;
-  };
-  error?: string;
-  message?: string;
-  test_mode?: boolean;
-  timestamp?: string;
 }
 
 class SiPayService {
@@ -521,9 +499,10 @@ class SiPayService {
   // Callback URL'lerini oluştur
   createCallbackUrls(): { return_url: string; cancel_url: string } {
     const baseUrl = window.location.origin;
+    const checkoutPath = window.location.pathname.includes('/checkout') ? '/checkout' : '/checkout';
     return {
-      return_url: `${baseUrl}/odeme-basarili`,
-      cancel_url: `${baseUrl}/odeme-basarisiz`
+      return_url: `${baseUrl}${checkoutPath}?payment=success`,
+      cancel_url: `${baseUrl}${checkoutPath}?payment=failed`
     };
   }
 }

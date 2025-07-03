@@ -22,7 +22,6 @@ const Checkout: React.FC = () => {
   } = useAddress();
   
   const [activeStep, setActiveStep] = useState<'bilgiler' | 'odeme' | 'onay'>('bilgiler');
-  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderData, setOrderData] = useState<any>(null);
@@ -146,8 +145,8 @@ const Checkout: React.FC = () => {
       
       try {
         // Şehir, ilçe, mahalle isimlerini al
-        const { cityName: selectedCityName, districtName: selectedDistrictName, townName: selectedTownName } = getSelectedNames(selectedCity, selectedDistrict, selectedTown);
-        const { cityName: billingCityName, districtName: billingDistrictName, townName: billingTownName } = getSelectedNames(billingSelectedCity, billingSelectedDistrict, billingSelectedTown);
+        const { cityName: selectedCityName, districtName: selectedDistrictName, townName: selectedTownName } = getSelectedNames();
+        const { cityName: billingCityName, districtName: billingDistrictName, townName: billingTownName } = getSelectedNames();
 
         // Kart son kullanma tarihini ayır
         const [expiry_month, expiry_year] = formData.sonKullanma.split('/');
@@ -283,12 +282,12 @@ const Checkout: React.FC = () => {
                   clearCart();
                   
                   // Pre-Auth ise kullanıcıya bilgi ver
-                  if (result.data.transaction_type === 'Pre-Authorization') {
+                  if (result.data.transaction_type === 'PreAuth') {
                     console.log('ℹ️ Pre-Auth ödeme - manuel onay gerekli');
                   }
                 } else {
-                  console.error('❌ Ikas sipariş oluşturma hatası:', orderPayload.error);
-                  throw new Error('Ödeme başarılı ancak sipariş oluşturulamadı: ' + orderPayload.error);
+                  console.error('❌ Ikas sipariş oluşturma hatası:', orderPayload.message);
+                  throw new Error('Ödeme başarılı ancak sipariş oluşturulamadı: ' + orderPayload.message);
                 }
               } catch (ikasError) {
                 console.error('❌ Ikas sipariş oluşturma hatası:', ikasError);
@@ -776,7 +775,7 @@ const Checkout: React.FC = () => {
                             />
                           </div>
                           
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
                             <div>
                               <label htmlFor="billingCity" className="block text-sm font-medium text-gray-700 mb-2">Fatura Şehir *</label>
                               <div className="relative">
@@ -810,6 +809,25 @@ const Checkout: React.FC = () => {
                                   <option value="">İlçe Seçiniz</option>
                                   {districts.map(district => (
                                     <option key={district.id} value={district.id}>{district.name}</option>
+                                  ))}
+                                </select>
+                                <ChevronDown className="absolute right-3 top-3 text-gray-400 w-5 h-5 pointer-events-none" />
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <label htmlFor="billingTown" className="block text-sm font-medium text-gray-700 mb-2">Fatura Mahalle</label>
+                              <div className="relative">
+                                <select 
+                                  id="billingTown"
+                                  value={billingSelectedTown}
+                                  onChange={(e) => setBillingSelectedTown(e.target.value)}
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-[#ee7f1a] focus:border-[#ee7f1a] outline-none transition-all duration-200 appearance-none bg-white"
+                                  disabled={!billingSelectedDistrict}
+                                >
+                                  <option value="">Mahalle Seçiniz</option>
+                                  {towns.map(town => (
+                                    <option key={town.id} value={town.id}>{town.name}</option>
                                   ))}
                                 </select>
                                 <ChevronDown className="absolute right-3 top-3 text-gray-400 w-5 h-5 pointer-events-none" />
@@ -1130,7 +1148,7 @@ const Checkout: React.FC = () => {
               
               <div className="p-6 space-y-4">
                 <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 mb-4">
-                  {(activeStep === 'onay' && orderData?.orderSummary ? orderData.orderSummary.items : items).map(item => (
+                  {(activeStep === 'onay' && orderData?.orderSummary ? orderData.orderSummary.items : items).map((item: any) => (
                     <div key={item.id} className="flex gap-3 py-3">
                       <div className="w-14 h-14 rounded-lg overflow-hidden bg-gradient-to-br from-orange-100 to-yellow-50">
                         <img 

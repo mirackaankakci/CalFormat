@@ -19,22 +19,26 @@ export interface Town {
 }
 
 class AddressService {
-  private baseUrl = "https://calformat.com/"
+  private baseUrl: string;
   
   // Cache for loaded data
   private citiesCache: City[] = [];
   private districtsCache: District[] = [];
 
+  constructor() {
+    this.baseUrl = this.getBaseUrl();
+  }
+
   // Environment bazlı URL belirleme
   private getBaseUrl(): string {
-    const isDev = window.location.hostname === 'localhost';
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     
     if (isDev) {
-      // Development: Vite proxy kullan
+      // Development: Vite proxy kullan (proxy ayarları vite.config.ts'de)
       return '';
     } else {
-      // Production: public klasörüne işaret et
-      return '/';
+      // Production: calformat.com domain
+      return 'https://calformat.com.tr';
     }
   }
 
@@ -80,7 +84,10 @@ class AddressService {
   // İlçeleri getir (PHP endpoint kullanarak)
   async getDistricts(cityId: string): Promise<District[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/ikas_districts.php?cityId=${encodeURIComponent(cityId)}`, {
+      const url = `${this.baseUrl}/ikas_districts.php?cityId=${encodeURIComponent(cityId)}`;
+      console.log('🌍 İlçeler API çağrısı:', url);
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -90,21 +97,36 @@ class AddressService {
         cache: 'no-cache'
       });
       
+      console.log('📡 İlçeler API response status:', response.status);
+      console.log('📡 İlçeler API response headers:', Object.fromEntries(response.headers.entries()));
+      
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ İlçeler API Error Response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
-      const result = await response.json();
+      const responseText = await response.text();
+      console.log('📄 İlçeler API raw response:', responseText.substring(0, 500));
+      
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON Parse Error:', parseError);
+        console.error('❌ Raw response:', responseText);
+        throw new Error(`JSON Parse Error: ${parseError}`);
+      }
       
       if (result.success) {
-        console.log(`İlçeler başarıyla yüklendi (${cityId}):`, result.data.length, 'adet');
+        console.log(`✅ İlçeler başarıyla yüklendi (${cityId}):`, result.data.length, 'adet');
         this.districtsCache = result.data || [];
         return result.data || [];
       } else {
-        throw new Error(result.error || 'İlçeler yüklenemedi');
+        throw new Error(result.message || result.error || 'İlçeler yüklenemedi');
       }
     } catch (error) {
-      console.error('İlçeler yüklenirken hata:', error);
+      console.error('❌ İlçeler yüklenirken hata:', error);
       // Fallback data
       const fallbackDistricts = [
         { id: '2a4e8b8c-f3c9-4e8d-9f7a-8b2c3d4e5f6g', name: 'Kadıköy' },
