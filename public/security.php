@@ -60,36 +60,13 @@ function getSecureConfig() {
             'encryption_key' => $_ENV['ENCRYPTION_KEY'] ?? 'CalFormat2024SecureKey!@#$',
             'debug_mode' => filter_var($_ENV['DEBUG_MODE'] ?? 'false', FILTER_VALIDATE_BOOLEAN),
             'log_level' => $_ENV['LOG_LEVEL'] ?? 'ERROR'
-        ]
-                'http://localhost:5173',
-                'http://127.0.0.1:3000',
-                'http://127.0.0.1:5173'
-            ],
-            'rate_limit' => [
-                'requests_per_minute' => 60,
-                'requests_per_hour' => 1000,
-                'burst_limit' => 10
-            ],
-            'hash_algorithm' => 'sha256',
-            'encryption_key' => $_ENV['ENCRYPTION_KEY'] ?? 'default_key_change_in_production_32chars',
-            'session_timeout' => 3600,
-            'max_request_size' => 1024 * 1024, // 1MB
-            'blocked_ips' => [],
-            'trusted_proxies' => [
-                '127.0.0.1',
-                '::1'
-            ]
         ],
-        
-        'frontend_url' => $_ENV['FRONTEND_URL'] ?? 'http://localhost:5173/checkout',
         
         'general' => [
             'currency' => 'TRY',
             'default_shipping_cost' => 29.90,
             'free_shipping_threshold' => 150.00,
-            'timezone' => 'Europe/Istanbul',
-            'debug_mode' => filter_var($_ENV['DEBUG_MODE'] ?? 'false', FILTER_VALIDATE_BOOLEAN),
-            'log_level' => $_ENV['LOG_LEVEL'] ?? 'ERROR'
+            'timezone' => 'Europe/Istanbul'
         ]
     ];
 }
@@ -102,7 +79,7 @@ function setSecurityHeaders($config) {
     
     if (in_array($origin, $allowedOrigins)) {
         header("Access-Control-Allow-Origin: $origin");
-    } elseif ($config['general']['debug_mode']) {
+    } elseif ($config['security']['debug_mode']) {
         header('Access-Control-Allow-Origin: *'); // Sadece development
     } else {
         header('Access-Control-Allow-Origin: null');
@@ -118,336 +95,167 @@ function setSecurityHeaders($config) {
     header('X-Frame-Options: DENY');
     header('X-XSS-Protection: 1; mode=block');
     header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
     
-    if (!$config['general']['debug_mode']) {
-        header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
+    // Content Security Policy
+    if (!$config['security']['debug_mode']) {
+        header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'");
     }
-    
-    // CSP - SiPay için özelleştirilmiş
-    $csp = [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://provisioning.sipay.com.tr",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: https:",
-        "connect-src 'self' https://provisioning.sipay.com.tr https://*.myikas.com",
-        "form-action 'self' https://provisioning.sipay.com.tr",
-        "frame-ancestors 'none'",
-        "object-src 'none'",
-        "base-uri 'self'"
-    ];
-    
-    header('Content-Security-Policy: ' . implode('; ', $csp));
-    
-    // Content type
-    header('Content-Type: application/json; charset=utf-8');
 }
 
-// Rate limiting kontrolü
-function checkRateLimit($config, $identifier = null) {
-    $identifier = $identifier ?: getClientIP();
-    $limits = $config['security']['rate_limit'];
+// Rate limiting kontrol
+function checkRateLimit($config) {
+    $clientIP = getClientIP();
+    $rateLimit = $config['security']['rate_limit'];
     
-    $minute_file = sys_get_temp_dir() . '/rate_limit_minute_' . md5($identifier);
-    $hour_file = sys_get_temp_dir() . '/rate_limit_hour_' . md5($identifier);
+    $cacheFile = __DIR__ . "/rate_limit_" . md5($clientIP) . ".tmp";
+    $maxRequests = $rateLimit['max_requests'];
+    $timeWindow = $rateLimit['time_window'];
     
-    $current_time = time();
-    $minute_start = $current_time - ($current_time % 60);
-    $hour_start = $current_time - ($current_time % 3600);
+    $currentTime = time();
+    $requestCount = 1;
     
-    // Dakika kontrolü
-    $minute_data = ['start' => $minute_start, 'count' => 0];
-    if (file_exists($minute_file)) {
-        $stored = json_decode(file_get_contents($minute_file), true);
-        if ($stored['start'] === $minute_start) {
-            $minute_data = $stored;
+    if (file_exists($cacheFile)) {
+        $data = json_decode(file_get_contents($cacheFile), true);
+        if ($data && ($currentTime - $data['start_time']) < $timeWindow) {
+            $requestCount = $data['count'] + 1;
+            if ($requestCount > $maxRequests) {
+                return false;
+            }
+            $data['count'] = $requestCount;
+        } else {
+            $data = ['start_time' => $currentTime, 'count' => 1];
         }
+    } else {
+        $data = ['start_time' => $currentTime, 'count' => 1];
     }
     
-    // Saat kontrolü
-    $hour_data = ['start' => $hour_start, 'count' => 0];
-    if (file_exists($hour_file)) {
-        $stored = json_decode(file_get_contents($hour_file), true);
-        if ($stored['start'] === $hour_start) {
-            $hour_data = $stored;
-        }
-    }
-    
-    // Limit kontrolleri
-    if ($minute_data['count'] >= $limits['requests_per_minute']) {
-        return false;
-    }
-    
-    if ($hour_data['count'] >= $limits['requests_per_hour']) {
-        return false;
-    }
-    
-    // Sayaçları artır
-    $minute_data['count']++;
-    $hour_data['count']++;
-    
-    file_put_contents($minute_file, json_encode($minute_data));
-    file_put_contents($hour_file, json_encode($hour_data));
-    
+    file_put_contents($cacheFile, json_encode($data));
     return true;
 }
 
-// IP adresini güvenli şekilde al
-function getClientIP() {
-    $config = getSecureConfig();
-    $trustedProxies = $config['security']['trusted_proxies'];
-    
-    $ipHeaders = [
-        'HTTP_CF_CONNECTING_IP',     // Cloudflare
-        'HTTP_X_FORWARDED_FOR',      // Standard proxy
-        'HTTP_X_FORWARDED',
-        'HTTP_X_CLUSTER_CLIENT_IP',
-        'HTTP_CLIENT_IP',
-        'REMOTE_ADDR'
-    ];
-    
-    foreach ($ipHeaders as $header) {
-        if (!empty($_SERVER[$header])) {
-            $ips = array_map('trim', explode(',', $_SERVER[$header]));
-            
-            foreach ($ips as $ip) {
-                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-                    return $ip;
-                }
-                
-                // Trusted proxy kontrolü
-                if (in_array($ip, $trustedProxies)) {
-                    continue;
-                }
-                
-                if (filter_var($ip, FILTER_VALIDATE_IP)) {
-                    return $ip;
-                }
-            }
-        }
-    }
-    
-    return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-}
-
-// Request boyutu kontrolü
+// Request boyutu kontrol
 function checkRequestSize($config) {
     $maxSize = $config['security']['max_request_size'];
     $contentLength = $_SERVER['CONTENT_LENGTH'] ?? 0;
-    
     return $contentLength <= $maxSize;
 }
 
-// Hash doğrulama
-function verifySignature($data, $signature, $secret) {
-    $calculated = hash_hmac('sha256', $data, $secret);
-    return hash_equals($calculated, $signature);
-}
-
-// Güvenli logging
-function securityLog($message, $level = 'INFO', $context = []) {
-    $config = getSecureConfig();
-    
-    if (!$config['general']['debug_mode'] && $level === 'DEBUG') {
-        return;
-    }
-    
-    $timestamp = date('Y-m-d H:i:s');
-    $ip = getClientIP();
-    $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-    
-    $logEntry = [
-        'timestamp' => $timestamp,
-        'level' => $level,
-        'ip' => $ip,
-        'user_agent' => substr($userAgent, 0, 200),
-        'message' => $message,
-        'context' => $context
-    ];
-    
-    $logFile = __DIR__ . '/security.log';
-    file_put_contents($logFile, json_encode($logEntry) . "\n", FILE_APPEND | LOCK_EX);
-    
-    // Kritik durumlar için sistem log'una da yaz
-    if (in_array($level, ['ERROR', 'CRITICAL', 'SECURITY'])) {
-        error_log("SECURITY[$level]: $message - IP: $ip");
-    }
-}
-
-// Input sanitization
-function sanitizeInput($input, $type = 'string') {
-    switch ($type) {
-        case 'email':
-            return filter_var($input, FILTER_SANITIZE_EMAIL);
-        case 'url':
-            return filter_var($input, FILTER_SANITIZE_URL);
-        case 'int':
-            return filter_var($input, FILTER_SANITIZE_NUMBER_INT);
-        case 'float':
-            return filter_var($input, FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
-        case 'string':
-        default:
-            return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
-    }
-}
-
-// SQL injection korunması için parametreli sorgu yardımcısı
-function secureQuery($pdo, $sql, $params = []) {
-    try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        return $stmt;
-    } catch (PDOException $e) {
-        securityLog('SQL Error: ' . $e->getMessage(), 'ERROR');
-        throw new Exception('Database error occurred');
-    }
-}
-
-// Dosya upload güvenliği
-function validateFileUpload($file, $allowedTypes = [], $maxSize = 1048576) {
-    if (!isset($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
-        return false;
-    }
-    
-    if ($file['size'] > $maxSize) {
-        return false;
-    }
-    
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mimeType = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
-    
-    if (!in_array($mimeType, $allowedTypes)) {
-        return false;
-    }
-    
-    // Dosya adını güvenli hale getir
-    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $safeName = uniqid() . '.' . $extension;
-    
-    return $safeName;
-}
-
-// XSS korunması
-function antiXSS($input) {
-    return htmlspecialchars($input, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-}
-
-// CSRF token oluştur
-function generateCSRFToken() {
-    if (!isset($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    }
-    return $_SESSION['csrf_token'];
-}
-
-// CSRF token doğrula
-function validateCSRFToken($token) {
-    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
-}
-
-// HTTP Method kontrolü
-function validateHttpMethod($allowedMethods = ['GET', 'POST']) {
+// HTTP method validation
+function validateHttpMethod($allowedMethods) {
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     return in_array($method, $allowedMethods);
 }
 
-// Environment dosyası güvenlik kontrolü
-function validateEnvironmentSecurity() {
-    $warnings = [];
-    
-    // .env dosyasının web erişimini kontrol et
-    $envPath = __DIR__ . '/.env';
-    if (file_exists($envPath)) {
-        $envUrl = (isset($_SERVER['HTTPS']) ? 'https://' : 'http://') . 
-                  $_SERVER['HTTP_HOST'] . 
-                  dirname($_SERVER['REQUEST_URI']) . '/.env';
-        
-        $context = stream_context_create([
-            'http' => [
-                'timeout' => 3,
-                'ignore_errors' => true
-            ]
-        ]);
-        
-        $response = @file_get_contents($envUrl, false, $context);
-        if ($response !== false && strlen($response) > 0) {
-            $warnings[] = 'CRITICAL: .env file is accessible via web! Check .htaccess rules.';
-            securityLog('CRITICAL SECURITY ISSUE: .env file accessible via web', 'CRITICAL', [
-                'url' => $envUrl,
-                'ip' => getClientIP()
-            ]);
-        }
+// Input sanitization
+function sanitizeInput($input) {
+    if (is_array($input)) {
+        return array_map('sanitizeInput', $input);
     }
-    
-    // Hardcoded credentials kontrolü
-    $sensitiveFiles = [
-        'get_token.php',
-        'ikas_products.php',
-        'ikas_create_order.php'
+    return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
+}
+
+// Client IP alma
+function getClientIP() {
+    $headers = [
+        'HTTP_CF_CONNECTING_IP',     // Cloudflare
+        'HTTP_X_FORWARDED_FOR',      // Proxy
+        'HTTP_X_FORWARDED',          // Proxy
+        'HTTP_X_CLUSTER_CLIENT_IP',  // Cluster
+        'HTTP_FORWARDED_FOR',        // Proxy
+        'HTTP_FORWARDED',            // Proxy
+        'REMOTE_ADDR'                // Standard
     ];
     
-    foreach ($sensitiveFiles as $file) {
-        $filePath = __DIR__ . '/' . $file;
-        if (file_exists($filePath)) {
-            $content = file_get_contents($filePath);
-            if (preg_match('/[\'"](?:client_id|client_secret|app_id|app_secret)[\'\"]\s*=>\s*[\'"][^\'\"]+[\'"]/', $content)) {
-                $warnings[] = "WARNING: Hardcoded credentials found in $file";
+    foreach ($headers as $header) {
+        if (!empty($_SERVER[$header])) {
+            $ips = explode(',', $_SERVER[$header]);
+            $ip = trim($ips[0]);
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                return $ip;
             }
         }
     }
     
-    return $warnings;
+    return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 }
 
-// Güvenlik başlangıç kontrolü
-function initializeSecurity($config) {
-    // Environment güvenlik kontrolü
-    $securityWarnings = validateEnvironmentSecurity();
+// Güvenlik logları
+function securityLog($message, $level = 'INFO', $context = []) {
+    $config = getSecureConfig();
+    $logLevel = $config['security']['log_level'];
     
-    if (!empty($securityWarnings)) {
-        foreach ($securityWarnings as $warning) {
-            securityLog($warning, 'SECURITY', ['ip' => getClientIP()]);
-        }
-        
-        // Production'da kritik hataları logla ve devam et
-        if (!$config['general']['debug_mode']) {
-            foreach ($securityWarnings as $warning) {
-                if (strpos($warning, 'CRITICAL') !== false) {
-                    error_log("SECURITY ALERT: $warning");
-                }
-            }
-        }
+    $levels = ['DEBUG' => 0, 'INFO' => 1, 'WARNING' => 2, 'ERROR' => 3];
+    
+    if ($levels[$level] < $levels[$logLevel]) {
+        return; // Log seviyesi yeterli değil
     }
     
-    return $securityWarnings;
+    $logEntry = [
+        'timestamp' => date('Y-m-d H:i:s'),
+        'level' => $level,
+        'message' => $message,
+        'ip' => getClientIP(),
+        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+        'context' => $context
+    ];
+    
+    $logFile = __DIR__ . '/security.log';
+    $logLine = json_encode($logEntry) . "\n";
+    
+    // Log dosyasının boyutunu sınırla (5MB)
+    if (file_exists($logFile) && filesize($logFile) > 5 * 1024 * 1024) {
+        rename($logFile, $logFile . '.old');
+    }
+    
+    file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX);
 }
 
-// IP bloklama kontrolü
-function checkIPBlock($config) {
-    $clientIP = getClientIP();
-    $blockedIPs = $config['security']['blocked_ips'];
+// Session güvenlik ayarları
+function initSecureSession($config) {
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.cookie_secure', 1);
+    ini_set('session.use_strict_mode', 1);
+    ini_set('session.cookie_samesite', 'Strict');
     
-    if (in_array($clientIP, $blockedIPs)) {
-        securityLog('Blocked IP attempted access', 'SECURITY', ['ip' => $clientIP]);
+    session_name($_ENV['SESSION_NAME'] ?? 'CALFORMAT_SESSION');
+    session_start();
+    
+    // Session fixation korunması
+    if (!isset($_SESSION['initiated'])) {
+        session_regenerate_id(true);
+        $_SESSION['initiated'] = true;
+    }
+    
+    // Session timeout
+    $timeout = $_ENV['SESSION_LIFETIME'] ?? 3600;
+    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > $timeout)) {
+        session_unset();
+        session_destroy();
+        session_start();
+    }
+    $_SESSION['last_activity'] = time();
+}
+
+// Token doğrulama
+function validateToken($token, $secret) {
+    $parts = explode('.', $token);
+    if (count($parts) !== 3) {
         return false;
     }
     
-    return true;
+    list($header, $payload, $signature) = $parts;
+    
+    $validSignature = hash_hmac('sha256', $header . '.' . $payload, $secret, true);
+    $validSignature = base64url_encode($validSignature);
+    
+    return hash_equals($signature, $validSignature);
 }
 
-// Güvenli environment variable okuma
-function getEnvVar($key, $default = null) {
-    // Önce $_ENV'den oku
-    if (isset($_ENV[$key])) {
-        return $_ENV[$key];
-    }
-    
-    // Sonra getenv() ile
-    $value = getenv($key);
-    if ($value !== false) {
-        return $value;
-    }
-    
-    return $default;
+function base64url_encode($data) {
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
 }
-?>
+
+function base64url_decode($data) {
+    return base64_decode(str_pad(strtr($data, '-_', '+/'), strlen($data) % 4, '=', STR_PAD_RIGHT));
+}
