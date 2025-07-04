@@ -47,7 +47,20 @@ function getSecureConfig() {
                 'https://calformat.com',
                 'https://www.calformat.com',
                 'https://calformat.vercel.app',
+                'https://mirackaankakci.github.io',
                 'http://localhost:3000',
+                'http://localhost:5173'
+            ],
+            'rate_limit' => [
+                'max_requests' => 200,
+                'time_window' => 60
+            ],
+            'max_request_size' => 2048576, // 2MB
+            'hash_algorithm' => 'sha256',
+            'encryption_key' => $_ENV['ENCRYPTION_KEY'] ?? 'CalFormat2024SecureKey!@#$',
+            'debug_mode' => filter_var($_ENV['DEBUG_MODE'] ?? 'false', FILTER_VALIDATE_BOOLEAN),
+            'log_level' => $_ENV['LOG_LEVEL'] ?? 'ERROR'
+        ]
                 'http://localhost:5173',
                 'http://127.0.0.1:3000',
                 'http://127.0.0.1:5173'

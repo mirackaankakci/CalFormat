@@ -62,8 +62,22 @@ try {
 
     securityLog('2D payment process started', 'INFO', ['ip' => getClientIP()]);
 
-    // SiPay konfigürasyonu
-    $siPayConfig = $config['sipay'];
+    // Test modu kontrolü
+    $testMode = filter_var($siPayConfig['test_mode'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
+    
+    if ($testMode === true) {
+        securityLog('Test mode active - returning mock payment response', 'INFO');
+        
+        echo json_encode([
+            'success' => true,
+            'payment_url' => 'https://test.sipay.com.tr/ccpayment/api/payment',
+            'payment_id' => 'TEST_' . uniqid(),
+            'test_mode' => true,
+            'message' => 'Test modu aktif - Gerçek ödeme yapılmadı',
+            'timestamp' => date('Y-m-d H:i:s')
+        ]);
+        exit();
+    }
 
     // POST verilerini al ve sanitize et
     $rawInput = file_get_contents('php://input');

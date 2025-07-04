@@ -29,15 +29,24 @@ try {
 
     $cityId = sanitizeInput($cityId);
 
-    // Test modu kontrolü
-    if (isset($config['ikas']['test_mode']) && $config['ikas']['test_mode'] === true) {
+    // Test modu kontrolü - düzeltildi
+    $testMode = filter_var($config['ikas']['test_mode'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
+    
+    if ($testMode === true) {
+        securityLog('Test mode active - returning mock districts', 'INFO');
+        
         echo json_encode([
             'success' => true,
             'data' => [
-                ['id' => '1', 'name' => 'Test İlçe 1'],
-                ['id' => '2', 'name' => 'Test İlçe 2']
+                ['id' => '1', 'name' => 'Kadıköy'],
+                ['id' => '2', 'name' => 'Beşiktaş'],
+                ['id' => '3', 'name' => 'Şişli'],
+                ['id' => '4', 'name' => 'Beyoğlu'],
+                ['id' => '5', 'name' => 'Üsküdar']
             ],
+            'count' => 5,
             'test_mode' => true,
+            'message' => 'Test modu aktif - Mock veri döndürülüyor',
             'timestamp' => date('Y-m-d H:i:s')
         ]);
         exit();

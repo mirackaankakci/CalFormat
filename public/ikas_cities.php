@@ -33,21 +33,24 @@ try {
         exit();
     }
 
-    // Test modu kontrolü
-    $testMode = $config['ikas']['test_mode'] ?? false;
-    securityLog('Test mode check', 'INFO', ['test_mode' => $testMode]);
+    // Test modu kontrolü - .env'den oku
+    $testMode = filter_var($config['ikas']['test_mode'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
     
-    if ($testMode === true || $testMode === 'true') {
-        securityLog('Test mode active - returning fallback cities', 'INFO');
-        
-        // Test için fallback data
-        $fallbackCities = getFallbackCities();
+    if ($testMode === true) {
+        securityLog('Test mode active - returning mock cities', 'INFO');
         
         echo json_encode([
             'success' => true,
-            'data' => $fallbackCities,
-            'count' => count($fallbackCities),
+            'data' => [
+                ['id' => '1', 'name' => 'İstanbul'],
+                ['id' => '2', 'name' => 'Ankara'],
+                ['id' => '3', 'name' => 'İzmir'],
+                ['id' => '4', 'name' => 'Bursa'],
+                ['id' => '5', 'name' => 'Antalya']
+            ],
+            'count' => 5,
             'test_mode' => true,
+            'message' => 'Test modu aktif - Mock veri döndürülüyor',
             'timestamp' => date('Y-m-d H:i:s')
         ]);
         exit();
