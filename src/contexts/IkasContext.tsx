@@ -45,6 +45,7 @@ interface IkasContextType {
   error: string;
   setError: (error: string) => void;
   fetchProducts: () => Promise<void>; // ✅ Fetch fonksiyonu eklendi
+  retryFetchProducts: () => Promise<void>; // ✅ Retry fonksiyonu eklendi
 }
 
 const IkasContext = createContext<IkasContextType | undefined>(undefined);
@@ -64,28 +65,56 @@ export const IkasProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log('🔄 PHP API\'den ürünler getiriliyor...');
       
-      const response = await fetch('/ikas_products.php', {
+      // Environment'a göre URL belirleme
+      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const apiUrl = isDev ? '/ikas_products.php' : 'https://calformat.com/ikas_products.php';
+      
+      console.log('🌍 API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
+        credentials: 'omit',
+        cache: 'no-cache',
+        signal: AbortSignal.timeout(30000) // 30 saniye timeout
       });
 
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response OK:', response.ok);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }      const data = await response.json();
+        const errorText = await response.text();
+        console.error('❌ Ürünler API Error Response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+
+      const responseText = await response.text();
+      console.log('📄 Ürünler API raw response preview:', responseText.substring(0, 200) + '...');
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON Parse Error:', parseError);
+        console.error('❌ Raw response excerpt:', responseText.substring(0, 500));
+        throw new Error(`JSON Parse Error: ${parseError}`);
+      }
+      
       console.log('📦 PHP API Response:', data);
 
       // PHP API response format kontrolü
-      if (data.success && data.data?.listProduct?.data) {
+      if (data.success && data.data) {
         // Başarılı response
-        const ikasProducts = data.data.listProduct.data;
-          const transformedProducts: ProductData[] = ikasProducts.map((product: IkasProduct, index: number) => ({
+        const ikasProducts = data.data;
+        const transformedProducts: ProductData[] = ikasProducts.map((product: IkasProduct, index: number) => ({
           id: parseInt(product.id) || index + 1,
           name: product.name || 'İsimsiz Ürün',
           description: product.description || undefined, // ✅ API'den gelen açıklama
           price: product.variants?.[0]?.prices?.[0]?.sellPrice || 299.99,
-          image: 'https://www.calformat.com.tr/calformat.webp',
+          image: 'https://www.calformat.com/calformat.webp',
           rating: 4.8,
           reviewCount: 2847,
           features: [
@@ -102,19 +131,19 @@ export const IkasProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setProducts(transformedProducts);
         console.log('✅ Ürünler başarıyla yüklendi:', transformedProducts.length);
         
-      } else if (data.error || !data.success) {
-        // Hata durumu - fallback data kullan
-        console.warn('⚠️ API hatası, fallback data kullanılıyor:', data.message);
+      } else if (data.fallback_data) {
+        // Fallback data kullan
+        console.warn('⚠️ Ürünler API hatası, fallback data kullanılıyor:', data.message);
         
-        // PHP'den dönen fallback data'yı kullan
-        const fallbackProducts = data.data?.listProduct?.data || [];
+        const fallbackProducts = data.fallback_data || [];
         
-        if (fallbackProducts.length > 0) {          const transformedProducts: ProductData[] = fallbackProducts.map((product: any, index: number) => ({
+        if (fallbackProducts.length > 0) {
+          const transformedProducts: ProductData[] = fallbackProducts.map((product: any, index: number) => ({
             id: parseInt(product.id) || index + 1,
             name: product.name || 'CalFormat Ürün',
             description: product.description || undefined, // ✅ Fallback description
             price: product.variants?.[0]?.prices?.sellPrice || product.variants?.[0]?.prices?.[0]?.sellPrice || 299.99,
-            image: 'https://www.calformat.com.tr/calformat.webp',
+            image: 'https://www.calformat.com/calformat.webp',
             rating: 4.8,
             reviewCount: 2847,
             features: ['%100 Doğal İçerik', 'Pestisit Temizleyici', 'Balmumu Çözücü'],
@@ -124,14 +153,15 @@ export const IkasProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           
           setProducts(transformedProducts);
           console.log('✅ Fallback ürünler yüklendi:', transformedProducts.length);
-        } else {          // Son çare: hard-coded fallback
+        } else {
+          // Son çare: hard-coded fallback
           const hardcodedProducts: ProductData[] = [
             {
               id: 1,
               name: 'CalFormat Meyve Sebze Temizleme Tozu - 1kg',
               description: 'Doğal bileşenlerle hazırlanmış özel formülümüz ile meyve ve sebzelerinizdeki pestisit, balmumu ve zararlı kalıntıları etkili şekilde temizleyin. %100 doğal içerikli, güvenli ve etkili temizlik çözümü.',
               price: 299.99,
-              image: 'https://www.calformat.com.tr/calformat.webp',
+              image: 'https://www.calformat.com/calformat.webp',
               rating: 4.8,
               reviewCount: 2847,
               features: ['%100 Doğal İçerik', 'Pestisit Temizleyici', 'Balmumu Çözücü'],
@@ -145,7 +175,7 @@ export const IkasProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         setError(`API Uyarısı: ${data.message || 'Veri alınamadı'}`);
       } else {
-        throw new Error('Beklenmeyen response formatı');
+        throw new Error(data.message || 'Beklenmeyen response formatı');
       }
 
     } catch (err) {
@@ -158,7 +188,7 @@ export const IkasProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           name: 'CalFormat Meyve Sebze Temizleme Tozu',
           description: 'Doğal bileşenlerle hazırlanmış özel formülümüz ile meyve ve sebzelerinizdeki pestisit, balmumu ve zararlı kalıntıları etkili şekilde temizleyin. %100 doğal içerikli, güvenli ve etkili temizlik çözümü.',
           price: 299.99,
-          image: 'https://www.calformat.com.tr/calformat.webp',
+          image: 'https://www.calformat.com/calformat.webp',
           rating: 4.8,
           reviewCount: 2847,
           features: ['%100 Doğal', 'Pestisit Temizleyici', 'Güvenli'],
@@ -171,6 +201,12 @@ export const IkasProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setLoading(false);
     }
+  };
+
+  // Retry fonksiyonu
+  const retryFetchProducts = async () => {
+    console.log('🔄 Ürünler tekrar getiriliyor...');
+    await fetchProducts();
   };
 
   // ✅ Component mount olduğunda ürünleri getir
@@ -187,7 +223,8 @@ export const IkasProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading,
       error,
       setError,
-      fetchProducts // ✅ Fetch fonksiyonunu da provide et
+      fetchProducts, // ✅ Fetch fonksiyonunu da provide et
+      retryFetchProducts // ✅ Retry fonksiyonunu da provide et
     }}>
       {children}
     </IkasContext.Provider>

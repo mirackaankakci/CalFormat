@@ -24,15 +24,6 @@ function getSecureConfig() {
     loadEnvironmentVariables();
     
     return [
-        'sipay' => [
-            'app_id' => $_ENV['SIPAY_APP_ID'] ?? '6d4a7e9374a76c15260fcc75e315b0b9',
-            'app_secret' => $_ENV['SIPAY_APP_SECRET'] ?? 'b46a67571aa1e7ef5641dc3fa6f1712a',
-            'merchant_key' => $_ENV['SIPAY_MERCHANT_KEY'] ?? 'test_merchant_key',
-            'base_url' => 'https://provisioning.sipay.com.tr/ccpayment',
-            'test_mode' => filter_var($_ENV['SIPAY_TEST_MODE'] ?? 'false', FILTER_VALIDATE_BOOLEAN),
-            'hash_secret' => $_ENV['SIPAY_HASH_SECRET'] ?? 'default_hash_secret_change_in_production',
-        ],
-        
         'ikas' => [
             'client_id' => $_ENV['IKAS_CLIENT_ID'] ?? '9ca242da-2ce0-44b5-8b3f-4d31e6a94958',
             'client_secret' => $_ENV['IKAS_CLIENT_SECRET'] ?? 's_TBvX9kDl7N8FPXlSHp1L3dHFbd1c286fbfb440aa9796a8b851994b32',

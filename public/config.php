@@ -15,35 +15,10 @@ if (!defined('INTERNAL_ACCESS')) {
     exit('Access denied');
 }
 
-// SiPay ve Ikas Mağaza Ayarları
+// Ikas Mağaza Ayarları
 // Bu dosyayı güvenli bir yerde tutun ve gerçek production değerleri ile güncelleyin
 
 return [
-    // SiPay Ayarları
-    'sipay' => [
-        'app_id' => getenv('SIPAY_APP_ID') ?: '6d4a7e9374a76c15260fcc75e315b0b9',
-        'app_secret' => getenv('SIPAY_APP_SECRET') ?: 'b46a67571aa1e7ef5641dc3fa6f1712a',
-        'merchant_key' => getenv('SIPAY_MERCHANT_KEY') ?: 'test_merchant_key',
-        'base_url' => getenv('SIPAY_BASE_URL') ?: 'https://provisioning.sipay.com.tr/ccpayment',
-        'test_mode' => getenv('SIPAY_TEST_MODE') === 'false' ? false : true,
-        
-        // Test kartları
-        'test_cards' => [
-            'visa' => [
-                'card_number' => '4508034508034509',
-                'expiry_month' => '12',
-                'expiry_year' => '2026',
-                'cvv' => '000'
-            ],
-            'mastercard' => [
-                'card_number' => '5406675406675403',
-                'expiry_month' => '12',
-                'expiry_year' => '2026',
-                'cvv' => '000'
-            ]
-        ]
-    ],
-    
     // Ikas Ayarları
     'ikas' => [
         'base_url' => getenv('IKAS_BASE_URL') ?: 'https://api.myikas.com',

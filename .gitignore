@@ -177,7 +177,7 @@ pids
 logs/
 security.log
 debug.log
-sipay_debug.log
+
 error.log
 access.log
 

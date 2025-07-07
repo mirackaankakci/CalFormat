@@ -19,6 +19,5 @@
     "esModuleInterop": true
     // composite özelliği kaldırıldı
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src"]
 }

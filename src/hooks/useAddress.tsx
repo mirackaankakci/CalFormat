@@ -16,6 +16,12 @@ export const useAddress = () => {
     towns: false
   });
 
+  const [errors, setErrors] = useState({
+    cities: null as string | null,
+    districts: null as string | null,
+    towns: null as string | null
+  });
+
   // Helper: Seçili şehir/ilçe/mahalle isimlerini getir
   const getSelectedNames = () => {
     const cityName = cities.find(c => c.id === selectedCity)?.name || addressService.getCityNameById(selectedCity);
@@ -26,43 +32,58 @@ export const useAddress = () => {
   };
 
   // İlleri yükle
-  useEffect(() => {
-    const loadCities = async () => {
-      setLoading(prev => ({ ...prev, cities: true }));
-      try {
-        const cityList = await addressService.getCities();
-        setCities(cityList);
-      } catch (error) {
-        console.error('İller yüklenirken hata:', error);
-      } finally {
-        setLoading(prev => ({ ...prev, cities: false }));
-      }
-    };
+  const loadCities = async () => {
+    setLoading(prev => ({ ...prev, cities: true }));
+    setErrors(prev => ({ ...prev, cities: null }));
+    try {
+      const cityList = await addressService.getCities();
+      setCities(cityList);
+    } catch (error) {
+      console.error('İller yüklenirken hata:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        cities: error instanceof Error ? error.message : 'İller yüklenirken hata oluştu' 
+      }));
+    } finally {
+      setLoading(prev => ({ ...prev, cities: false }));
+    }
+  };
 
+  useEffect(() => {
     loadCities();
   }, []);
 
   // İl seçildiğinde ilçeleri yükle
-  useEffect(() => {
-    if (selectedCity) {
-      const loadDistricts = async () => {
-        setLoading(prev => ({ ...prev, districts: true }));
-        setDistricts([]);
-        setTowns([]);
-        setSelectedDistrict('');
-        setSelectedTown('');
-        
-        try {
-          const districtList = await addressService.getDistricts(selectedCity);
-          setDistricts(districtList);
-        } catch (error) {
-          console.error('İlçeler yüklenirken hata:', error);
-        } finally {
-          setLoading(prev => ({ ...prev, districts: false }));
-        }
-      };
+  const loadDistricts = async (cityId: string) => {
+    console.log('🏙️ İlçeler yükleniyor - cityId:', cityId);
+    
+    setLoading(prev => ({ ...prev, districts: true }));
+    setErrors(prev => ({ ...prev, districts: null }));
+    setDistricts([]);
+    setTowns([]);
+    setSelectedDistrict('');
+    setSelectedTown('');
+    
+    try {
+      const districtList = await addressService.getDistricts(cityId);
+      console.log('✅ İlçeler yüklendi:', districtList.length, 'adet');
+      setDistricts(districtList);
+    } catch (error) {
+      console.error('❌ İlçeler yüklenirken hata:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        districts: error instanceof Error ? error.message : 'İlçeler yüklenirken hata oluştu' 
+      }));
+    } finally {
+      setLoading(prev => ({ ...prev, districts: false }));
+    }
+  };
 
-      loadDistricts();
+  useEffect(() => {
+    console.log('🔄 İl seçimi değişti:', selectedCity);
+    
+    if (selectedCity) {
+      loadDistricts(selectedCity);
     } else {
       setDistricts([]);
       setTowns([]);
@@ -72,24 +93,29 @@ export const useAddress = () => {
   }, [selectedCity]);
 
   // İlçe seçildiğinde mahalleleri yükle
+  const loadTowns = async (districtId: string) => {
+    setLoading(prev => ({ ...prev, towns: true }));
+    setErrors(prev => ({ ...prev, towns: null }));
+    setTowns([]);
+    setSelectedTown('');
+    
+    try {
+      const townList = await addressService.getTowns(districtId);
+      setTowns(townList);
+    } catch (error) {
+      console.error('Mahalleler yüklenirken hata:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        towns: error instanceof Error ? error.message : 'Mahalleler yüklenirken hata oluştu' 
+      }));
+    } finally {
+      setLoading(prev => ({ ...prev, towns: false }));
+    }
+  };
+
   useEffect(() => {
     if (selectedDistrict) {
-      const loadTowns = async () => {
-        setLoading(prev => ({ ...prev, towns: true }));
-        setTowns([]);
-        setSelectedTown('');
-        
-        try {
-          const townList = await addressService.getTowns(selectedDistrict);
-          setTowns(townList);
-        } catch (error) {
-          console.error('Mahalleler yüklenirken hata:', error);
-        } finally {
-          setLoading(prev => ({ ...prev, towns: false }));
-        }
-      };
-
-      loadTowns();
+      loadTowns(selectedDistrict);
     } else {
       setTowns([]);
       setSelectedTown('');
@@ -107,6 +133,11 @@ export const useAddress = () => {
     setSelectedDistrict,
     setSelectedTown,
     loading,
-    getSelectedNames
+    errors,
+    getSelectedNames,
+    // Retry functions
+    retryCities: loadCities,
+    retryDistricts: () => selectedCity && loadDistricts(selectedCity),
+    retryTowns: () => selectedDistrict && loadTowns(selectedDistrict)
   };
 };

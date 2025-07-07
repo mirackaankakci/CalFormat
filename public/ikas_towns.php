@@ -1,338 +1,252 @@
 <?php
-// Güvenli Ikas Mahalleler Endpoint
-require_once __DIR__ . '/security.php';
+// Güvenli Ikas Mahalleler Endpoint - Token + Mahalle Çekme Tek Dosyada
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Production'da 0
 
-// Güvenlik kontrollerini başlat
-if (!defined('SECURITY_LAYER_ACTIVE')) {
-    http_response_code(403);
-    exit('Security layer not initialized');
+// JSON response için header'lar
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// OPTIONS preflight
+if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
 }
 
 try {
-    // Konfigürasyonu yükle
-    $config = getSecureConfig();
-    
-    // Güvenlik header'larını ayarla
-    setSecurityHeaders($config);
-    
-    // Rate limiting kontrolü
-    if (!checkRateLimit($config)) {
-        securityLog('Rate limit exceeded for towns', 'WARNING', ['ip' => getClientIP()]);
-        http_response_code(429);
-        echo json_encode([
-            'success' => false,
-            'error' => 'Too Many Requests',
-            'message' => 'Rate limit exceeded. Please try again later.'
-        ]);
-        exit();
-    }
-
-    // OPTIONS preflight
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-        http_response_code(200);
-        exit();
-    }
-
-    // districtId parametresini kontrol et
+    // districtId parametresi kontrolü
     $districtId = $_GET['districtId'] ?? null;
     if (!$districtId) {
         throw new Exception('districtId parametresi gerekli');
     }
 
-    // 1. TOKEN AL
-    $tokenUrl = 'https://calformat.myikas.com/api/admin/oauth/token';
-    $clientId = '9ca242da-2ce0-44b5-8b3f-4d31e6a94958';
-    $clientSecret = 's_TBvX9kDl7N8FPXlSHp1L3dHFbd1c286fbfb440aa9796a8b851994b32';
-
-    $tokenData = http_build_query([
+    // 1. İKAS KONFİGÜRASYON BİLGİLERİ - STATİK
+    $ikasConfig = [
+        'client_id' => '9ca242da-2ce0-44b5-8b3f-4d31e6a94958',
+        'client_secret' => 's_TBvX9kDl7N8FPXlSHp1L3dHFbd1c286fbfb440aa9796a8b851994b32',
+        'store_id' => 'calformat',
+        'base_url' => 'https://calformat.myikas.com/api',
+        'token_url' => 'https://calformat.myikas.com/api/admin/oauth/token',
+        'graphql_url' => 'https://api.myikas.com/api/v1/admin/graphql'
+    ];
+    
+    // 2. TOKEN ALMA İŞLEMİ
+    $tokenUrl = $ikasConfig['token_url'];
+    
+    $tokenData = [
         'grant_type' => 'client_credentials',
-        'client_id' => $clientId,
-        'client_secret' => $clientSecret
-    ]);
-
-    $ch = curl_init($tokenUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $tokenData);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/x-www-form-urlencoded',
-        'User-Agent: CalFormat-API/1.0'
-    ]);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    
-    $tokenResponse = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    
-    if (curl_error($ch)) {
-        throw new Exception('CURL Error: ' . curl_error($ch));
-    }
-    
-    curl_close($ch);
-
-    if ($httpCode !== 200) {
-        throw new Exception("Token alınamadı. HTTP Code: $httpCode");
-    }
-
-    $tokenJson = json_decode($tokenResponse, true);
-    $accessToken = $tokenJson['access_token'] ?? null;
-
-    if (!$accessToken) {
-        throw new Exception('Access token bulunamadı: ' . $tokenResponse);
-    }
-
-    // 2. GRAPHQL SORGUSU - MAHALLELER İÇİN
-    $graphqlUrl = 'https://api.myikas.com/api/v1/admin/graphql';
-    
-    $query = <<<'GRAPHQL'
-query ListTown($districtId: StringFilterInput!) {
-  listTown(districtId: $districtId) {
-    id
-    name
-  }
-}
-GRAPHQL;
-
-    $variables = [
-        "districtId" => [
-            "eq" => $districtId
-        ]
-    ];
-
-    $payload = [
-        'query' => $query,
-        'variables' => $variables
-    ];
-
-    $ch = curl_init($graphqlUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . $accessToken,
-        'User-Agent: CalFormat-API/1.0'
-    ]);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    
-    if (curl_error($ch)) {
-        throw new Exception('CURL Error: ' . curl_error($ch));
-    }
-    
-    curl_close($ch);
-
-    if ($httpCode !== 200) {
-        throw new Exception("GraphQL isteği başarısız. HTTP Code: $httpCode, Response: $response");
-    }
-
-    // JSON validation
-    $jsonData = json_decode($response, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        throw new Exception('JSON parse hatası: ' . json_last_error_msg());
-    }
-
-    // Mahalleleri çıkar ve düzenle
-    $towns = $jsonData['data']['listTown'] ?? [];
-    
-    // Response'u frontend formatında döndür
-    echo json_encode([
-        'success' => true,
-        'data' => $towns,
-        'count' => count($towns),
-        'districtId' => $districtId,
-        'timestamp' => date('Y-m-d H:i:s')
-    ]);
-
-} catch (Exception $e) {
-    // Detaylı hata logging
-    error_log("CalFormat Towns API Error: " . $e->getMessage());
-    
-    // Fallback data ile JSON hata response
-    $fallbackTowns = [
-        ['id' => 'caddebostan-town-id', 'name' => 'Caddebostan Mah.'],
-        ['id' => 'fenerbahce-town-id', 'name' => 'Fenerbahçe Mah.'],
-        ['id' => 'goztepe-town-id', 'name' => 'Göztepe Mah.'],
-        ['id' => 'kozyatagi-town-id', 'name' => 'Kozyatağı Mah.'],
-        ['id' => 'suadiye-town-id', 'name' => 'Suadiye Mah.']
+        'client_id' => $ikasConfig['client_id'],
+        'client_secret' => $ikasConfig['client_secret']
     ];
     
-    echo json_encode([
-        'success' => true,
-        'data' => $fallbackTowns,
-        'fallback' => true,
-        'error' => $e->getMessage(),
-        'timestamp' => date('Y-m-d H:i:s')
-    ]);
-}
-?>
-
-    // Token al
-    $tokenUrl = 'https://calformat.myikas.com/api/admin/oauth/token';
-    $clientId = '9ca242da-2ce0-44b5-8b3f-4d31e6a94958';
-    $clientSecret = 's_TBvX9kDl7N8FPXlSHp1L3dHFbd1c286fbfb440aa9796a8b851994b32';
-
-    $tokenData = http_build_query([
-        'grant_type' => 'client_credentials',
-        'client_id' => $clientId,
-        'client_secret' => $clientSecret
-    ]);
-
-    // cURL kullanımaya çalış, yoksa file_get_contents kullan
+    $tokenPostData = http_build_query($tokenData);
+    
     $accessToken = null;
+    $tokenMethod = 'unknown';
+    $tokenResponse = '';
     
+    // Önce cURL dene
     if (function_exists('curl_init')) {
-        debug_log('cURL ile token alınıyor...');
-        $ch = curl_init($tokenUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $tokenMethod = 'curl';
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $tokenUrl);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $tokenData);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $tokenPostData);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/x-www-form-urlencoded',
+            'User-Agent: CalFormat-API/1.0'
+        ]);
         
         $tokenResponse = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $tokenHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $tokenError = curl_error($ch);
         curl_close($ch);
         
-        if ($tokenResponse && $httpCode === 200) {
-            $tokenResult = json_decode($tokenResponse, true);
-            if (isset($tokenResult['access_token'])) {
-                $accessToken = $tokenResult['access_token'];
-            }
+        if ($tokenResponse !== false && $tokenHttpCode === 200) {
+            $tokenJson = json_decode($tokenResponse, true);
+            $accessToken = $tokenJson['access_token'] ?? null;
         }
     }
     
-    if (!$accessToken) {
-        debug_log('file_get_contents ile token alınıyor...');
-        $context = stream_context_create([
+    // cURL başarısızsa file_get_contents dene
+    if (!$accessToken && function_exists('file_get_contents')) {
+        $tokenMethod = 'file_get_contents';
+        $tokenContext = stream_context_create([
             'http' => [
-                'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
                 'method' => 'POST',
-                'content' => $tokenData
+                'header' => "Content-Type: application/x-www-form-urlencoded\r\n" .
+                           "User-Agent: CalFormat-API/1.0\r\n",
+                'content' => $tokenPostData,
+                'timeout' => 30
+            ],
+            'ssl' => [
+                'verify_peer' => false,
+                'verify_peer_name' => false
             ]
         ]);
         
-        $tokenResponse = file_get_contents($tokenUrl, false, $context);
-        if ($tokenResponse) {
-            $tokenResult = json_decode($tokenResponse, true);
-            if (isset($tokenResult['access_token'])) {
-                $accessToken = $tokenResult['access_token'];
-            }
+        $tokenResponse = @file_get_contents($tokenUrl, false, $tokenContext);
+        
+        if ($tokenResponse !== false) {
+            $tokenJson = json_decode($tokenResponse, true);
+            $accessToken = $tokenJson['access_token'] ?? null;
         }
     }
-
+    
+    // Token alınamazsa mevcut token'ı kullan
     if (!$accessToken) {
-        throw new Exception('Token alınamadı');
+        $accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjljYTI0MmRhLTJjZTAtNDRiNS04YjNmLTRkMzFlNmE5NDk1OCIsImVtYWlsIjoibXktaWthcy1hcGkiLCJmaXJzdE5hbWUiOiJteS1pa2FzLWFwaSIsImxhc3ROYW1lIjoiIiwic3RvcmVOYW1lIjoiY2FsZm9ybWF0IiwibWVyY2hhbnRJZCI6ImM3NjVkMTFmLTA3NmYtNGE1OS04MTE2LTZkYzhmNzM2ZjI2YyIsImZlYXR1cmVzIjpbMTAsMTEsMTIsMiwyMDEsMyw0LDUsNyw4LDldLCJhdXRob3JpemVkQXBwSWQiOiI5Y2EyNDJkYS0yY2UwLTQ0YjUtOGIzZi00ZDMxZTZhOTQ5NTgiLCJzYWxlc0NoYW5uZWxJZCI6IjIwNjYxNzE2LTkwZWMtNDIzOC05MDJhLTRmMDg0MTM0NThjOCIsInR5cGUiOjQsImV4cCI6MTc1MTYzNjU2NjU3NywiaWF0IjoxNzUxNjIyMTY2NTc3LCJpc3MiOiJjNzY1ZDExZi0wNzZmLTRhNTktODExNi02ZGM4ZjczNmYyNmMiLCJzdWIiOiI5Y2EyNDJkYS0yY2UwLTQ0YjUtOGIzZi00ZDMxZTZhOTQ5NTgifQ.GiPopPyJgavFgIopNdaJqYm_ER0M92aTfQaIwuLFiMw';
+        $tokenMethod = 'fallback_existing_token';
     }
 
-    debug_log('Token başarıyla alındı');
-
-    // Mahalleleri çek
-    $graphqlUrl = 'https://api.myikas.com/api/v1/admin/graphql';
+    // 3. MAHALLELER API ÇAĞRISI - GRAPHQL İLE
+    $graphqlUrl = $ikasConfig['graphql_url'];
     
-    $query = [
-        'query' => '
-            query ListTown($districtId: StringFilterInput!) {
-                listTown(districtId: $districtId) {
-                    id
-                    name
-                }
-            }
-        ',
-        'variables' => [
-            'districtId' => [
-                'eq' => $districtId
-            ]
+    $query = 'query ListTown($districtId: StringFilterInput!) {
+        listTown(districtId: $districtId) {
+            id
+            name
+        }
+    }';
+
+    $variables = [
+        'districtId' => [
+            'eq' => $districtId
         ]
     ];
 
-    debug_log('GraphQL sorgusu hazırlandı: ' . json_encode($query));
-
-    // GraphQL isteği gönder
-    $townResponse = null;
+    $graphqlData = json_encode([
+        'query' => $query,
+        'variables' => $variables
+    ]);
     
+    $towns = [];
+    $townMethod = 'unknown';
+    
+    // Önce cURL ile GraphQL dene
     if (function_exists('curl_init')) {
-        debug_log('cURL ile GraphQL isteği gönderiliyor...');
-        $ch = curl_init($graphqlUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $townMethod = 'curl_graphql';
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $graphqlUrl);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($query));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $graphqlData);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Authorization: Bearer ' . $accessToken,
-            'Content-Type: application/json'
+            'Content-Type: application/json',
+            'User-Agent: CalFormat-API/1.0'
         ]);
         
         $townResponse = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $townHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $townError = curl_error($ch);
         curl_close($ch);
+        
+        if ($townResponse !== false && $townHttpCode === 200) {
+            $townJson = json_decode($townResponse, true);
+            if (isset($townJson['data']['listTown'])) {
+                $towns = $townJson['data']['listTown'];
+            }
+        }
     }
     
-    if (!$townResponse) {
-        debug_log('file_get_contents ile GraphQL isteği gönderiliyor...');
-        $context = stream_context_create([
+    // cURL başarısızsa file_get_contents ile GraphQL dene
+    if (empty($towns) && function_exists('file_get_contents')) {
+        $townMethod = 'file_get_contents_graphql';
+        $townContext = stream_context_create([
             'http' => [
-                'header' => "Authorization: Bearer $accessToken\r\n" .
-                          "Content-Type: application/json\r\n",
                 'method' => 'POST',
-                'content' => json_encode($query)
+                'header' => "Authorization: Bearer " . $accessToken . "\r\n" .
+                           "Content-Type: application/json\r\n" .
+                           "User-Agent: CalFormat-API/1.0\r\n",
+                'content' => $graphqlData,
+                'timeout' => 30
             ]
         ]);
+
+        $townResponse = @file_get_contents($graphqlUrl, false, $townContext);
         
-        $townResponse = file_get_contents($graphqlUrl, false, $context);
+        if ($townResponse !== false) {
+            $townJson = json_decode($townResponse, true);
+            if (isset($townJson['data']['listTown'])) {
+                $towns = $townJson['data']['listTown'];
+            }
+        }
     }
 
-    if (!$townResponse) {
-        throw new Exception('Mahalleler API çağrısı başarısız');
+    // 4. BAŞARILI RESPONSE DÖNDÜR
+    if (!empty($towns)) {
+        echo json_encode([
+            'success' => true,
+            'data' => $towns,
+            'count' => count($towns),
+            'api_info' => [
+                'token_method' => $tokenMethod,
+                'town_method' => $townMethod,
+                'token_obtained' => !empty($accessToken),
+                'graphql_url' => $graphqlUrl,
+                'districtId' => $districtId
+            ],
+            'timestamp' => date('Y-m-d H:i:s')
+        ]);
+        exit();
     }
-
-    debug_log('GraphQL yanıtı alındı: ' . substr($townResponse, 0, 200) . '...');
-
-    $result = json_decode($townResponse, true);
     
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        throw new Exception('JSON decode hatası: ' . json_last_error_msg());
-    }
-
-    if (isset($result['errors'])) {
-        debug_log('GraphQL hatası: ' . json_encode($result['errors']));
-        throw new Exception('GraphQL hatası: ' . json_encode($result['errors']));
-    }
-
-    $towns = $result['data']['listTown'] ?? [];
-    
-    debug_log('Mahalleler başarıyla alındı. Toplam: ' . count($towns));
-
-    // Başarılı yanıt
-    echo json_encode([
-        'success' => true,
-        'data' => $towns,
-        'count' => count($towns),
-        'districtId' => $districtId,
-        'timestamp' => date('Y-m-d H:i:s')
-    ]);
+    // 5. MAHALLE BULUNAMAZSA FALLBACK
+    throw new Exception('Mahalle verisi alınamadı. districtId: ' . $districtId . ', Response: ' . ($townResponse ?? 'null') . ' | HTTP Code: ' . ($townHttpCode ?? 'unknown'));
 
 } catch (Exception $e) {
-    debug_log('HATA: ' . $e->getMessage());
+    error_log('Towns API error: ' . $e->getMessage());
     
-    // Hata durumunda fallback data
-    $fallbackTowns = [
-        ['id' => 'caddebostan-town-id', 'name' => 'Caddebostan Mah.'],
-        ['id' => 'fenerbahce-town-id', 'name' => 'Fenerbahçe Mah.'],
-        ['id' => 'goztepe-town-id', 'name' => 'Göztepe Mah.'],
-        ['id' => 'suadiye-town-id', 'name' => 'Suadiye Mah.'],
-        ['id' => 'bostanci-town-id', 'name' => 'Bostancı Mah.']
-    ];
-    
+    // 6. HATA DURUMUNDA DETAYLI RESPONSE
+    http_response_code(500);
     echo json_encode([
-        'success' => true,
-        'data' => $fallbackTowns,
-        'fallback' => true,
-        'error' => $e->getMessage(),
+        'success' => false,
+        'error' => true,
+        'message' => 'Mahalleler API\'sinde hata oluştu',
+        'debug_info' => [
+            'error_message' => $e->getMessage(),
+            'error_file' => basename($e->getFile()),
+            'error_line' => $e->getLine(),
+            'token_method' => $tokenMethod ?? 'not_attempted',
+            'town_method' => $townMethod ?? 'not_attempted',
+            'access_token_exists' => isset($accessToken) && !empty($accessToken),
+            'token_response' => isset($tokenResponse) ? substr($tokenResponse, 0, 200) . '...' : 'null',
+            'town_response' => isset($townResponse) ? substr($townResponse, 0, 200) . '...' : 'null',
+            'curl_available' => function_exists('curl_init'),
+            'file_get_contents_available' => function_exists('file_get_contents'),
+            'https_support' => in_array('https', stream_get_wrappers()),
+            'token_url' => $ikasConfig['token_url'],
+            'graphql_url' => $ikasConfig['graphql_url'],
+            'districtId' => $districtId ?? 'not_provided',
+            'ikas_config' => [
+                'client_id' => '***' . substr($ikasConfig['client_id'], -4),
+                'store_id' => $ikasConfig['store_id']
+            ]
+        ],
+        'fallback_data' => [
+            ['id' => '1', 'name' => 'Caferağa Mahallesi'],
+            ['id' => '2', 'name' => 'Fenerbahçe Mahallesi'],
+            ['id' => '3', 'name' => 'Kozyatağı Mahallesi'],
+            ['id' => '4', 'name' => 'Bostancı Mahallesi'],
+            ['id' => '5', 'name' => 'Göztepe Mahallesi'],
+            ['id' => '6', 'name' => 'Acıbadem Mahallesi'],
+            ['id' => '7', 'name' => 'Suadiye Mahallesi'],
+            ['id' => '8', 'name' => 'Erenköy Mahallesi']
+        ],
+        'server_info' => [
+            'php_version' => phpversion(),
+            'curl_available' => function_exists('curl_init'),
+            'file_get_contents_available' => function_exists('file_get_contents'),
+            'https_support' => in_array('https', stream_get_wrappers())
+        ],
         'timestamp' => date('Y-m-d H:i:s')
     ]);
 }
-
-debug_log('Mahalleler API çağrısı tamamlandı');
-?>

@@ -48,7 +48,7 @@ const CTASection: React.FC = () => {
   const [error, setError] = useState<string>('');
   const { addToCart } = useCart();
   const navigate = useNavigate();
-  const { setProducts: setIkasProducts, setLoading: setIkasLoading, setError: setIkasError } = useIkas();
+  const { products: ikasProducts, loading: ikasLoading, error: ikasError, retryFetchProducts } = useIkas();
   // ✅ Sepete ekleme fonksiyonu
   const handleAddToCart = (product: Product) => {
     addToCart({
@@ -65,117 +65,37 @@ const CTASection: React.FC = () => {
     }
   };
 
+  // IkasContext'ten gelen verileri Product formatına dönüştür
   useEffect(() => {
-    const fetchProducts = async () => {      try {
-        setLoading(true);
-        setError('');
-        setIkasLoading(true);
-        setIkasError('');        // ✅ Development için doğru path kullan
-        const apiEndpoint = 'https://calformat.com/ikas_products.php';
-        
-        console.log(`🔄 API çağrısı yapılıyor: ${apiEndpoint}`);
-        
-        const response = await fetch(apiEndpoint, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          mode: 'cors',
-          cache: 'no-cache',
-          credentials: 'omit'
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }        const data = await response.json();
-        console.log('📊 API Response:', data);
-
-        if (data.error) {
-          throw new Error(data.message || 'API hatası döndü');
-        }
-
-        // ✅ Hem başarılı hem hatalı durumları handle et
-        let ikasProducts;
-        if (data.success && data.data?.listProduct?.data) {
-          ikasProducts = data.data.listProduct.data;
-        } else if (data.data?.listProduct?.data) {
-          ikasProducts = data.data.listProduct.data;
-        } else {
-          throw new Error('Geçersiz veri yapısı - Ürün verisi bulunamadı');
-        }
-
-        if (!Array.isArray(ikasProducts) || ikasProducts.length === 0) {
-          throw new Error('Ürün listesi boş');
-        }        const transformedProducts: Product[] = ikasProducts.map((ikasProduct: IkasProduct, index: number) => {
-          // ✅ Debug için detaylı log
-          console.log(`🔍 Ürün ${index + 1}:`, {
-            id: ikasProduct?.id,
-            name: ikasProduct?.name,
-            variants: ikasProduct?.variants,
-            firstVariant: ikasProduct?.variants?.[0],
-            prices: ikasProduct?.variants?.[0]?.prices,
-            firstPrice: ikasProduct?.variants?.[0]?.prices?.[0],
-            sellPrice: ikasProduct?.variants?.[0]?.prices?.[0]?.sellPrice
-          });
-          
-          // ✅ Fiyat alımını düzelt - prices artık array
-          const firstVariant = ikasProduct?.variants?.[0];
-          const firstPrice = firstVariant?.prices?.[0];
-          const sellPrice = firstPrice?.sellPrice || 299.99;
-          
-          console.log(`💰 Hesaplanan fiyat: ${sellPrice}`);
-          
-          return {
-            id: parseInt(ikasProduct?.id || String(index + 1)),
-            name: ikasProduct?.name || 'CalFormat Ürünü',
-            price: sellPrice,
-            image: "/calformat.webp",
-            rating: 4.8,
-            reviewCount: Math.floor(Math.random() * 200) + 50,            features: [
-              ikasProduct?.brand?.name || "CalFormat",
-              "Doğal İçerik", 
-              // ✅ totalStock null kontrolü
-              ikasProduct?.totalStock !== null && (ikasProduct?.totalStock || 0) > 0 
-                ? "Stokta Var" 
-                : ikasProduct?.totalStock === null 
-                  ? "Sınırsız Stok" 
-                  : "Sınırlı Stok"
-            ],
-            // ✅ Stock null ise sınırsız kabul et
-            stock: ikasProduct?.totalStock ?? 999,            brand: ikasProduct?.brand?.name || "CalFormat"
-          };
-        });
-
-        setProducts(transformedProducts);
-        setIkasProducts(transformedProducts); // ✅ Global context'i de güncelle
-
-      } catch (err: any) {
-        console.error('❌ Fetch hatası:', err);
-        setError(err.message || 'Ürünler yüklenemedi');
-        setIkasError(err.message || 'Ürünler yüklenemedi');
-        // ✅ Fallback ürünleri KALDIR - Sadece hata göster
-        setProducts([]);
-        setIkasProducts([]);
-      } finally {
-        setLoading(false);
-        setIkasLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, []);
+    if (ikasProducts && ikasProducts.length > 0) {
+      const transformedProducts: Product[] = ikasProducts.map((ikasProduct, index) => ({
+        id: ikasProduct.id,
+        name: ikasProduct.name || 'CalFormat Ürünü',
+        price: ikasProduct.price,
+        image: ikasProduct.image || "/calformat.webp",
+        rating: ikasProduct.rating || 4.8,
+        reviewCount: ikasProduct.reviewCount || 100,
+        features: ikasProduct.features || ["Doğal İçerik", "Kaliteli", "Güvenli"],
+        stock: ikasProduct.stock ?? 999,
+        brand: ikasProduct.brand || "CalFormat",
+        variants: [{ id: "7868c357-4726-432a-ad5d-49619e6a508b" }] // Fallback variant
+      }));
+      
+      setProducts(transformedProducts);
+      setLoading(false);
+      setError('');
+    } else if (ikasError) {
+      setLoading(false);
+      setError(ikasError);
+    } else {
+      setLoading(ikasLoading);
+    }
+  }, [ikasProducts, ikasLoading, ikasError]);
 
   // ✅ Tekrar deneme fonksiyonu
   const retryFetch = () => {
-    setLoading(true);
-    setError('');
-    setProducts([]);
-    
-    // useEffect'teki fetchProducts fonksiyonunu tetikle
-    setTimeout(() => {
-      window.location.reload(); // Sayfayı yenile
-    }, 100);
+    console.log('🔄 Ürünler yeniden getiriliyor...');
+    retryFetchProducts();
   };
   // Loading durumu
   if (loading) {

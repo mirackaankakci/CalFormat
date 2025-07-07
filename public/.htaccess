@@ -1,4 +1,4 @@
-# SiPay 3D ödeme için CSP ayarları - TAMAMEN KALDIR
+# Güvenlik ayarları
 Header always unset Content-Security-Policy
 Header always unset X-Content-Security-Policy  
 Header always unset X-WebKit-CSP
@@ -8,7 +8,7 @@ Header always unset X-XSS-Protection
 Header always unset X-Content-Type-Options
 Header always unset Referrer-Policy
 
-# SiPay için güvenlik header'larını esnetle
+# Güvenlik header'ları
 Header always set X-Frame-Options "ALLOWALL"
 
 # Meta refresh ve form-action için izin ver
@@ -39,7 +39,7 @@ Header always set Access-Control-Allow-Credentials "true"
     AddOutputFilterByType DEFLATE application/json
 </IfModule>
 
-# Security headers (SiPay için esnek)
+# Security headers
 # Header always set X-Frame-Options "SAMEORIGIN"
 # Header always set X-Content-Type-Options "nosniff"
 # Header always set Referrer-Policy "strict-origin-when-cross-origin"
@@ -86,10 +86,6 @@ Header always set Access-Control-Allow-Credentials "true"
     Deny from all
 </Files>
 
-<Files "sipay_debug.log">
-    Order Allow,Deny
-    Deny from all
-</Files>
 
 # Backup ve geçici dosyaları koru
 <FilesMatch "\.(bak|backup|old|tmp|temp|swp|swo|~)$">

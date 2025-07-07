@@ -23,6 +23,7 @@ import { ReviewProvider } from './contexts/ReviewContext';
 import { BlogProvider } from './contexts/BlogContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { IkasProvider } from './contexts/IkasContext';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import SEO from './components/common/SEO';
 import useSEO from './hooks/useSEO';
 import BlogList from './components/pages/BlogList';
@@ -38,7 +39,7 @@ import Profile from './components/pages/Profile';
 import Unauthorized from './components/pages/Unauthorized';
 import VerifyEmail from './components/pages/VerifyEmail';
 import AdminDebug from './components/pages/AdminDebug';
-import { useSiPayCallback } from './hooks/useSiPayCallback';
+
 
 // ✅ Blog migration script'i - geliştirme için
 import addSlugsToExistingBlogs from './scripts/addSlugsToBlogs';
@@ -292,26 +293,24 @@ function App() {
         </Helmet>
         
         <BrowserRouter>
-          <CartProvider>
-            <ReviewProvider>
-              <BlogProvider>
-                <IkasProvider>
-                  <AppContent />
-                  <SiPayCallbackHandler />
-                </IkasProvider>
-              </BlogProvider>
-            </ReviewProvider>
-          </CartProvider>
+          <ErrorBoundary>
+            <CartProvider>
+              <ReviewProvider>
+                <BlogProvider>
+                  <IkasProvider>
+                    <AppContent />
+
+                  </IkasProvider>
+                </BlogProvider>
+              </ReviewProvider>
+            </CartProvider>
+          </ErrorBoundary>
         </BrowserRouter>
       </HelmetProvider>
     </AuthProvider>
   );
 }
 
-// SiPay callback handler bileşeni
-const SiPayCallbackHandler = () => {
-  useSiPayCallback();
-  return null;
-};
+
 
 export default App;

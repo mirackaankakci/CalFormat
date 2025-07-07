@@ -1,510 +1,364 @@
-export interface SiPayPaymentData {
-  // Kart bilgileri
+// Sipay Ödeme Servisi
+import { makeSecureRequest } from '../utils/secureRequest';
+
+export interface SipayPaymentData {
   cc_holder_name: string;
   cc_no: string;
   expiry_month: string;
   expiry_year: string;
   cvv: string;
-  
-  // Ödeme bilgileri
-  total: number;
-  currency_code?: string; // USD, TRY, EUR
-  installments_number?: number;
-  invoice_id: string; // Benzersiz sipariş numarası
+  currency_code: 'TRY' | 'USD' | 'EUR';
+  installments_number: number;
+  invoice_id: string;
   invoice_description: string;
-  
-  // Müşteri bilgileri
   name: string;
   surname: string;
-  
-  // Sepet ürünleri
-  items: string; // JSON string
-  
-  // URL'ler
+  total: number;
+  items: string; // JSON string of cart items
   cancel_url: string;
   return_url: string;
-  
-  // Fatura adresi
   bill_address1?: string;
-  bill_address2?: string;
   bill_city?: string;
-  bill_postcode?: string;
   bill_state?: string;
+  bill_postcode?: string;
   bill_country?: string;
-  bill_email: string;
-  bill_phone: string;
-  
-  // İşlem tipi
-  transaction_type?: 'Auth' | 'PreAuth';
-  
-  // IP adresi (gerekli)
-  ip?: string;
-  
-  // Komisyon ayarları
-  is_commission_from_user?: string; // "1" ise aktif
-  commission_by?: 'merchant' | 'user';
-  
-  // Kart programı (opsiyonel)
-  card_program?: 'WORLD' | 'BONUS' | 'MAXIMUM' | 'BANKKART_COMBO' | 'PARAF' | 'AXESS' | 'ADVANT' | 'CARD_FNS';
-  
-  // Webhook anahtarı
-  sale_web_hook_key?: string;
-  
-  // Yinelenen ödeme
-  order_type?: number; // 1 ise yinelenen ödeme
-  recurring_payment_number?: number;
-  recurring_payment_cycle?: 'D' | 'M' | 'Y';
-  recurring_payment_interval?: string;
-  recurring_web_hook_key?: string;
-  
-  // Sigorta ödemeleri için
-  vpos_type?: 'insurance';
-  identity_number?: string; // TCKN/VKN/TIN (10-11 basamak)
+  bill_email?: string;
+  bill_phone?: string;
 }
 
-// 2D (Non-Secure) ödeme yanıtı
-export interface SiPay2DPaymentResponse {
+export interface SipayResponse {
   success: boolean;
-  data?: {
-    payment_status: number; // 1: başarılı, 0: başarısız
-    transaction_type: 'Auth' | 'PreAuth';
-    order_id: string;
-    invoice_id: string;
-    total: number;
-    currency_code: string;
-    hash_key: string;
-    sipay_status: number;
-    status_description: string;
-    merchant_commission?: number;
-    user_commission?: number;
-    transaction_date?: string;
-  };
-  error?: string;
-  message?: string;
-  test_mode?: boolean;
-  timestamp?: string;
-}
-
-export interface SiPayTokenResponse {
-  success: boolean;
-  data?: {
-    status_code: number;
-    status_description: string;
-    data: {
-      token: string;
-      is_3d: number;
-    };
-  };
-  error?: string;
-  message?: string;
-}
-
-export interface SiPayPaymentResponse {
-  success: boolean;
-  payment_form?: string;
+  data?: any;
+  payment_status?: number;
+  transaction_type?: string;
   invoice_id?: string;
-  payment_url?: string;
-  form_data?: any;
-  error?: string;
+  api_info?: {
+    token_method: string;
+    payment_method: string;
+    http_code: number;
+    hash_key: string;
+  };
   message?: string;
+  error?: boolean;
+  debug_info?: any;
+  timestamp: string;
 }
 
-class SiPayService {
-  private baseUrl: string;
+export interface SipayTokenResponse {
+  success: boolean;
+  token_obtained: boolean;
+  token_method: string;
+  config_info: {
+    token_url: string;
+    payment_url: string;
+    app_id: string;
+    merchant_id: string;
+  };
+  test_data: {
+    currency_codes: string[];
+    max_installments: number;
+    supported_cards: string[];
+  };
+  timestamp: string;
+}
 
-  constructor() {
-    // Environment bazlı URL belirleme
-    const isDev = window.location.hostname === 'localhost';
-    this.baseUrl = isDev ? '' : '/';
-  }
+class SipayService {
+  private baseUrl = '/sipay_payment.php';
 
-  // Token alma
-  async getToken(): Promise<SiPayTokenResponse> {
+  /**
+   * Sipay token test - bağlantı kontrolü
+   */
+  async testToken(): Promise<SipayTokenResponse> {
     try {
-      console.log('🔑 SiPay token alınıyor...');
-
-      const response = await fetch(`${this.baseUrl}sipay_token.php`, {
+      console.log('🔍 Sipay token test ediliyor...');
+      
+      const response = await makeSecureRequest<SipayTokenResponse>(this.baseUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
         },
-        mode: 'cors', // CORS modunu açıkça belirt
-        credentials: 'omit',
-        cache: 'no-cache'
       });
 
-      console.log('📊 Token response status:', response.status);
-      console.log('📊 Token response headers:', Object.fromEntries(response.headers.entries()));
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Token API Error Response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log('📄 Token API yanıtı:', result);
-      
-      if (result.success) {
-        console.log('✅ SiPay token başarıyla alındı:', result.data);
-        return result;
-      } else {
-        throw new Error(result.message || 'Token alınamadı');
-      }
+      console.log('✅ Sipay token test sonucu:', response);
+      return response;
     } catch (error) {
-      console.error('❌ SiPay token alma hatası:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Token alma hatası'
-      };
+      console.error('❌ Sipay token test hatası:', error);
+      throw new Error('Sipay token test edilemedi');
     }
   }
 
-  // 3D Ödeme hazırlama
-  async preparePayment(paymentData: SiPayPaymentData): Promise<SiPayPaymentResponse> {
-    try {
-      console.log('SiPay ödeme hazırlanıyor:', paymentData);
+  /**
+   * Kredi kartı numarasını formatla (****-****-****-1234)
+   */
+  formatCardNumber(cardNumber: string): string {
+    const cleaned = cardNumber.replace(/\D/g, '');
+    if (cleaned.length >= 16) {
+      return cleaned.replace(/(\d{4})(\d{4})(\d{4})(\d{4})/, '$1-$2-$3-$4');
+    }
+    return cardNumber;
+  }
 
-      const response = await fetch(`${this.baseUrl}sipay_prepare_payment.php`, {
+  /**
+   * Kredi kartı numarasını maskele (güvenlik için)
+   */
+  maskCardNumber(cardNumber: string): string {
+    const cleaned = cardNumber.replace(/\D/g, '');
+    if (cleaned.length >= 16) {
+      const first6 = cleaned.substring(0, 6);
+      const last4 = cleaned.substring(cleaned.length - 4);
+      return `${first6}******${last4}`;
+    }
+    return cardNumber;
+  }
+
+  /**
+   * Kart son kullanma tarihini validate et
+   */
+  validateExpiry(month: string, year: string): boolean {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1;
+    
+    const expMonth = parseInt(month);
+    const expYear = parseInt(year);
+    
+    if (expMonth < 1 || expMonth > 12) return false;
+    if (expYear < currentYear) return false;
+    if (expYear === currentYear && expMonth < currentMonth) return false;
+    
+    return true;
+  }
+
+  /**
+   * Luhn algoritması ile kart numarası validate et
+   */
+  validateCardNumber(cardNumber: string): boolean {
+    const cleaned = cardNumber.replace(/\D/g, '');
+    
+    if (cleaned.length < 13 || cleaned.length > 19) {
+      return false;
+    }
+    
+    let sum = 0;
+    let isEven = false;
+    
+    for (let i = cleaned.length - 1; i >= 0; i--) {
+      let digit = parseInt(cleaned.charAt(i));
+      
+      if (isEven) {
+        digit *= 2;
+        if (digit > 9) {
+          digit -= 9;
+        }
+      }
+      
+      sum += digit;
+      isEven = !isEven;
+    }
+    
+    return sum % 10 === 0;
+  }
+
+  /**
+   * Kart türünü tespit et
+   */
+  getCardType(cardNumber: string): string {
+    const cleaned = cardNumber.replace(/\D/g, '');
+    
+    if (cleaned.match(/^4/)) return 'VISA';
+    if (cleaned.match(/^5[1-5]/)) return 'MASTERCARD';
+    if (cleaned.match(/^3[47]/)) return 'AMEX';
+    if (cleaned.match(/^6/)) return 'DISCOVER';
+    
+    return 'UNKNOWN';
+  }
+
+  /**
+   * Sipay ile ödeme işlemi gerçekleştir
+   */
+  async processPayment(paymentData: SipayPaymentData): Promise<SipayResponse> {
+    try {
+      console.log('💳 Sipay ödeme işlemi başlatılıyor...', {
+        invoice_id: paymentData.invoice_id,
+        total: paymentData.total,
+        currency: paymentData.currency_code,
+        installments: paymentData.installments_number
+      });
+
+      // Kart numarası validasyonu
+      if (!this.validateCardNumber(paymentData.cc_no)) {
+        throw new Error('Geçersiz kart numarası');
+      }
+
+      // Son kullanma tarihi validasyonu
+      if (!this.validateExpiry(paymentData.expiry_month, paymentData.expiry_year)) {
+        throw new Error('Kartın son kullanma tarihi geçmiş');
+      }
+
+      // CVV validasyonu
+      const cardType = this.getCardType(paymentData.cc_no);
+      const cvvLength = cardType === 'AMEX' ? 4 : 3;
+      if (paymentData.cvv.length !== cvvLength) {
+        throw new Error(`CVV ${cvvLength} haneli olmalıdır`);
+      }
+
+      const response = await makeSecureRequest<SipayResponse>(this.baseUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
         },
-        credentials: 'omit',
-        cache: 'no-cache',
-        body: JSON.stringify(paymentData)
+        body: JSON.stringify(paymentData),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      console.log('✅ Sipay ödeme yanıtı:', response);
 
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log('SiPay ödeme hazırlandı:', result);
-        return result;
-      } else {
-        throw new Error(result.message || 'Ödeme hazırlanamadı');
-      }
-    } catch (error) {
-      console.error('SiPay ödeme hazırlama hatası:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Ödeme hazırlama hatası'
-      };
-    }
-  }
-
-  // 3D ödeme formunu submit et - Geliştirilmiş yöntem
-  async submitPaymentForm(formData: any, paymentUrl: string): Promise<void> {
-    try {
-      console.log('SiPay form submit ediliyor:', { formData, paymentUrl });
-      
-      // Önce server-side redirect ile deneyelim (daha güvenilir)
-      try {
-        const response = await fetch(`${this.baseUrl}sipay_form_redirect.php`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            form_data: formData,
-            payment_url: paymentUrl
-          })
+      // Ödeme durumunu kontrol et
+      if (response.success && response.payment_status === 1) {
+        console.log('🎉 Ödeme başarılı!', {
+          transaction_type: response.transaction_type,
+          invoice_id: response.invoice_id
         });
+      } else {
+        console.warn('⚠️ Ödeme başarısız:', response);
         
-        if (response.ok) {
-          const html = await response.text();
-          
-          // Yeni pencere açmayı dene
-          const newWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
-          
-          if (newWindow) {
-            newWindow.document.open();
-            newWindow.document.write(html);
-            newWindow.document.close();
-            console.log('✅ SiPay formu yeni pencerede açıldı');
-            return;
+        // API'den gelen hata mesajlarını kullanıcı dostu hale getir
+        if (response.data && response.data.status_description) {
+          const errorMsg = response.data.status_description;
+          if (errorMsg.includes('Items must be an array')) {
+            throw new Error('Sepet bilgileri işlenirken hata oluştu. Lütfen tekrar deneyin.');
+          } else if (errorMsg.includes('Invalid card')) {
+            throw new Error('Geçersiz kart bilgileri. Lütfen bilgilerinizi kontrol edin.');
+          } else if (errorMsg.includes('Insufficient funds')) {
+            throw new Error('Kartınızda yeterli bakiye bulunmuyor.');
+          } else if (errorMsg.includes('Invalid hash key') || errorMsg.includes('Hash validation failed')) {
+            throw new Error('Güvenlik doğrulaması başarısız. Lütfen tekrar deneyin.');
           } else {
-            // Popup engellenirse mevcut pencerede aç
-            document.open();
-            document.write(html);
-            document.close();
-            console.log('✅ SiPay formu mevcut pencerede açıldı');
-            return;
+            throw new Error(`Ödeme hatası: ${errorMsg}`);
           }
+        } else if (response.message && response.message.includes('Hash validation failed')) {
+          throw new Error('Güvenlik doğrulaması başarısız. Lütfen tekrar deneyin.');
         } else {
-          throw new Error('Server-side redirect failed');
-        }
-      } catch (serverError) {
-        console.warn('Server-side redirect başarısız, client-side deneniyor:', serverError);
-        
-        // Fallback: Client-side form oluştur
-        const formHtml = this.createPaymentFormHtml(formData, paymentUrl);
-        
-        // Yeni pencere dene
-        const newWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
-        
-        if (newWindow) {
-          newWindow.document.write(formHtml);
-          newWindow.document.close();
-          console.log('✅ SiPay formu client-side yeni pencerede açıldı');
-        } else {
-          // Son çare: Mevcut pencerede
-          document.open();
-          document.write(formHtml);
-          document.close();
-          console.log('✅ SiPay formu client-side mevcut pencerede açıldı');
+          throw new Error('Ödeme işlemi başarısız oldu. Lütfen tekrar deneyin.');
         }
       }
-      
+
+      return response;
     } catch (error) {
-      console.error('❌ Tüm SiPay form submit yöntemleri başarısız:', error);
-      alert('Ödeme sayfasına yönlendirilemiyor. Lütfen sayfayı yenileyin ve tekrar deneyin.');
+      console.error('❌ Sipay ödeme hatası:', error);
+      throw error;
     }
   }
 
-  // HTML form oluştur
-  private createPaymentFormHtml(formData: any, paymentUrl: string): string {
-    let formHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>SiPay Güvenli Ödeme</title>
-        <style>
-          body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            text-align: center; 
-            padding: 50px; 
-            background: linear-gradient(135deg, #ee7f1a, #d62d27);
-            color: white;
-            margin: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-          }
-          .container {
-            background: rgba(255,255,255,0.1);
-            padding: 40px;
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-          }
-          .loading { margin: 20px 0; }
-          .spinner { 
-            border: 4px solid rgba(255,255,255,0.2);
-            border-radius: 50%; 
-            border-top: 4px solid #ffffff; 
-            width: 50px; 
-            height: 50px; 
-            animation: spin 1s linear infinite; 
-            margin: 0 auto 30px;
-          }
-          @keyframes spin { 
-            0% { transform: rotate(0deg); } 
-            100% { transform: rotate(360deg); } 
-          }
-          h2 { margin: 0 0 15px 0; font-size: 24px; }
-          p { margin: 10px 0; opacity: 0.9; }
-          .logo { font-size: 32px; font-weight: bold; margin-bottom: 20px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="logo">CalFormat</div>
-          <div class="loading">
-            <div class="spinner"></div>
-            <h2>Güvenli ödeme sayfasına yönlendiriliyorsunuz</h2>
-            <p>SiPay güvenli ödeme sistemine bağlanıyor...</p>
-            <p><small>Bu işlem birkaç saniye sürebilir.</small></p>
-          </div>
-          <form id="sipay_form" method="POST" action="${paymentUrl}" style="display: none;">
-    `;
-    
-    // Form alanlarını ekle
-    Object.keys(formData).forEach(key => {
-      const value = String(formData[key] || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-      formHtml += `<input type="hidden" name="${key}" value="${value}">`;
-    });
-    
-    formHtml += `
-          </form>
-          <script>
-            console.log('SiPay form hazırlandı, submit ediliyor...');
-            
-            // 2 saniye sonra formu submit et
-            setTimeout(function() {
-              try {
-                document.getElementById('sipay_form').submit();
-                console.log('SiPay form submit edildi');
-              } catch (error) {
-                console.error('Form submit hatası:', error);
-                alert('Ödeme sayfasına yönlendirilemiyor. Lütfen tekrar deneyin.');
-              }
-            }, 2000);
-          </script>
-        </div>
-      </body>
-      </html>
-    `;
-    
-    return formHtml;
-  }
-
-  // URL'den ödeme sonucunu parse et
-  parsePaymentResult(): { payment: string; order_id?: string; invoice_id?: string } | null {
-    const urlParams = new URLSearchParams(window.location.search);
-    const payment = urlParams.get('payment');
-    
-    if (payment) {
-      return {
-        payment,
-        order_id: urlParams.get('order_id') || undefined,
-        invoice_id: urlParams.get('invoice_id') || undefined
-      };
-    }
-    
-    return null;
-  }
-
-  // 2D (Non-Secure) Ödeme
-  async makePayment2D(paymentData: SiPayPaymentData): Promise<SiPay2DPaymentResponse> {
+  /**
+   * 3D Return verilerini işle (hash validation dahil)
+   */
+  async handle3DReturn(): Promise<any> {
     try {
-      console.log('💳 SiPay 2D ödeme başlatılıyor:', paymentData);
-
-      const response = await fetch(`${this.baseUrl}sipay_payment_2d.php`, {
+      console.log('🔄 3D Return verileri işleniyor...');
+      
+      // URL parametrelerinden 3D return verilerini al
+      const urlParams = new URLSearchParams(window.location.search);
+      const paymentStatus = urlParams.get('payment_status');
+      const invoiceId = urlParams.get('invoice_id');
+      const transactionId = urlParams.get('transaction_id');
+      const total = urlParams.get('total');
+      const currencyCode = urlParams.get('currency_code');
+      const hashKey = urlParams.get('hash_key');
+      const statusDescription = urlParams.get('status_description');
+      
+      if (!invoiceId || !total || !currencyCode || !hashKey) {
+        throw new Error('3D Return verileri eksik');
+      }
+      
+      // Hash validation için backend'e gönder
+      const returnData = {
+        payment_status: paymentStatus || '0',
+        invoice_id: invoiceId,
+        transaction_id: transactionId || '',
+        total: total,
+        currency_code: currencyCode,
+        hash_key: hashKey,
+        status_description: statusDescription || ''
+      };
+      
+      const response = await makeSecureRequest('/sipay_3d_return.php', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        credentials: 'omit',
-        cache: 'no-cache',
-        body: JSON.stringify(paymentData)
+        body: new URLSearchParams(returnData).toString(),
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
       
-      if (result.success) {
-        console.log('✅ SiPay 2D ödeme başarılı:', result);
-        return result;
-      } else {
-        throw new Error(result.message || '2D ödeme başarısız');
+      console.log('✅ 3D Return işlendi:', response);
+      
+      if (!response.success) {
+        if (response.error === 'Hash validation failed') {
+          throw new Error('Güvenlik doğrulaması başarısız. Ödeme güvenilir değil.');
+        } else {
+          throw new Error(response.message || '3D Return işleminde hata oluştu');
+        }
       }
+      
+      return response;
     } catch (error) {
-      console.error('❌ SiPay 2D ödeme hatası:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '2D ödeme hatası'
-      };
+      console.error('❌ 3D Return hatası:', error);
+      throw error;
     }
   }
 
-  // Ödeme durumu kontrol et
+  /**
+   * Ödeme durumunu kontrol et
+   */
   async checkPaymentStatus(invoiceId: string): Promise<any> {
     try {
       console.log('🔍 Ödeme durumu kontrol ediliyor:', invoiceId);
-
-      const response = await fetch(`${this.baseUrl}sipay_check_status.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ invoice_id: invoiceId })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('📊 Ödeme durumu:', result);
-      return result;
+      
+      // Bu endpoint'i ileride ekleyebiliriz
+      // Şimdilik client-side'da URL parametrelerini kontrol edeceğiz
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const sipayStatus = urlParams.get('sipay_status');
+      const orderNo = urlParams.get('order_no');
+      const returnedInvoiceId = urlParams.get('invoice_id');
+      
+      return {
+        sipay_status: sipayStatus,
+        order_no: orderNo,
+        invoice_id: returnedInvoiceId,
+        is_success: sipayStatus === '1',
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
       console.error('❌ Ödeme durumu kontrol hatası:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Taksit seçeneklerini getir
+   */
+  getInstallmentOptions(total: number): Array<{value: number, label: string, monthlyAmount: number}> {
+    const installments = [
+      { value: 1, label: 'Tek Çekim', rate: 0 },
+      { value: 2, label: '2 Taksit', rate: 0.02 },
+      { value: 3, label: '3 Taksit', rate: 0.04 },
+      { value: 6, label: '6 Taksit', rate: 0.08 },
+      { value: 9, label: '9 Taksit', rate: 0.12 },
+      { value: 12, label: '12 Taksit', rate: 0.16 }
+    ];
+
+    return installments.map(inst => {
+      const totalWithRate = total * (1 + inst.rate);
+      const monthlyAmount = totalWithRate / inst.value;
+      
       return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Durum kontrol hatası'
+        value: inst.value,
+        label: inst.value === 1 ? inst.label : `${inst.label} (${monthlyAmount.toFixed(2)} ₺/ay)`,
+        monthlyAmount: monthlyAmount
       };
-    }
-  }
-
-  // Pre-Auth ödemeyi onaylama
-  async confirmPayment(invoiceId: string): Promise<any> {
-    try {
-      console.log('✅ Pre-Auth ödeme onaylanıyor:', invoiceId);
-
-      const response = await fetch(`${this.baseUrl}sipay_confirm_payment.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ invoice_id: invoiceId })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('🎉 Pre-Auth ödeme onaylandı:', result);
-      return result;
-    } catch (error) {
-      console.error('❌ Pre-Auth ödeme onaylama hatası:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Ödeme onaylama hatası'
-      };
-    }
-  }
-
-  // Client IP adresini al
-  async getClientIP(): Promise<string> {
-    try {
-      // Gerçek IP almak için farklı servisler deneyelim
-      const response = await fetch('https://api.ipify.org?format=json');
-      const data = await response.json();
-      return data.ip || '127.0.0.1';
-    } catch (error) {
-      console.warn('IP alınamadı, fallback kullanılıyor:', error);
-      return '127.0.0.1';
-    }
-  }
-
-  // Hash key oluştur (frontend'de test için)
-  createHashKey(data: any, merchantKey: string): string {
-    // Bu normalde backend'de yapılmalı, burada sadece test için
-    const hashString = Object.keys(data)
-      .sort()
-      .map(key => `${key}=${data[key]}`)
-      .join('&') + merchantKey;
-    
-    // Basit hash (gerçek projede SHA256 kullanın)
-    return btoa(hashString).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
-  }
-
-  // Callback URL'lerini oluştur
-  createCallbackUrls(): { return_url: string; cancel_url: string } {
-    const baseUrl = window.location.origin;
-    const checkoutPath = window.location.pathname.includes('/checkout') ? '/checkout' : '/checkout';
-    return {
-      return_url: `${baseUrl}${checkoutPath}?payment=success`,
-      cancel_url: `${baseUrl}${checkoutPath}?payment=failed`
-    };
+    });
   }
 }
 
-export const siPayService = new SiPayService();
+export const sipayService = new SipayService();
+export default sipayService;

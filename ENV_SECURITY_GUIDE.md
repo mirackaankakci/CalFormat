@@ -61,14 +61,12 @@ location ~ /\.env {
 
 ### 1. Environment Variables Kullanın
 ```bash
-export SIPAY_APP_ID="real_value"
 export IKAS_CLIENT_ID="real_value"
 ```
 
 ### 2. Docker Secrets
 ```yaml
 secrets:
-  - sipay_secret
   - ikas_secret
 ```
 
