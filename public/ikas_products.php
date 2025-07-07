@@ -1,7 +1,7 @@
 <?php
 // Güvenli Ikas Ürünler Endpoint - Token + Ürün Çekme Tek Dosyada
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Production'da 0
+ini_set('display_errors', 1); // Debug için açık
 
 // JSON response için header'lar
 header('Content-Type: application/json; charset=utf-8');
@@ -60,6 +60,11 @@ try {
         $tokenHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $tokenError = curl_error($ch);
         curl_close($ch);
+        
+        // Debug: Token API çağrısı sonuçlarını logla
+        error_log("Token cURL Response: " . ($tokenResponse ? 'SUCCESS' : 'FAILED'));
+        error_log("Token HTTP Code: " . $tokenHttpCode);
+        error_log("Token cURL Error: " . ($tokenError ?: 'NONE'));
         
         if ($tokenResponse !== false && $tokenHttpCode === 200) {
             $tokenJson = json_decode($tokenResponse, true);
@@ -164,6 +169,11 @@ try {
         $productHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $productError = curl_error($ch);
         curl_close($ch);
+        
+        // Debug: API çağrısı sonuçlarını logla
+        error_log("GraphQL cURL Response: " . ($productResponse ? 'SUCCESS' : 'FAILED'));
+        error_log("GraphQL HTTP Code: " . $productHttpCode);
+        error_log("GraphQL cURL Error: " . ($productError ?: 'NONE'));
         
         if ($productResponse !== false && $productHttpCode === 200) {
             $productJson = json_decode($productResponse, true);

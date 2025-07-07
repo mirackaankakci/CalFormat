@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Shield, Check, User, MapPin, Loader2, Lock, AlertCircle } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useAddress } from '../../hooks/useAddress';
-import sipayService, { SipayPaymentData } from '../../services/sipayService';
+import sipayService, { SipayPaymentData } from '../../services/siPayService';
+import PaymentMethodSelector from '../ui/PaymentMethodSelector';
 
 const Checkout: React.FC = () => {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ const Checkout: React.FC = () => {
   const [orderData, setOrderData] = useState<any>(null);
   const [isCompany, setIsCompany] = useState(false);
   const [installmentOptions, setInstallmentOptions] = useState<any[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<'2D' | '3D'>('3D');
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -208,7 +210,8 @@ const Checkout: React.FC = () => {
         bill_postcode: '34000',
         bill_country: 'TR',
         bill_email: formData.email,
-        bill_phone: formData.phone
+        bill_phone: formData.phone,
+        payment_type: paymentMethod // 2D veya 3D ödeme türü
       };
 
       console.log('🔄 Sipay ödeme işlemi başlatılıyor...', paymentData);
@@ -628,6 +631,14 @@ const Checkout: React.FC = () => {
 
               {activeStep === 'odeme' && (
                 <div className="space-y-6">
+                  {/* Ödeme Yöntemi Seçimi */}
+                  <div className="bg-white rounded-lg shadow-sm border p-6">
+                    <PaymentMethodSelector 
+                      onPaymentMethodSelect={setPaymentMethod}
+                      selectedMethod={paymentMethod}
+                    />
+                  </div>
+
                   <div className="bg-white rounded-lg shadow-sm border p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                       <CreditCard className="h-5 w-5" />

@@ -1,6 +1,6 @@
 <?php
 // Güvenli Configuration Endpoint
-require_once __DIR__ . '/security.php';
+require_once __DIR__ . '/security_new.php';
 
 // Güvenlik kontrollerini başlat
 if (!defined('SECURITY_LAYER_ACTIVE')) {
@@ -15,7 +15,7 @@ if (!defined('INTERNAL_ACCESS')) {
     exit('Access denied');
 }
 
-// Ikas Mağaza Ayarları
+// Ikas Mağaza Ayarları ve SiPay Ödeme Sistemi
 // Bu dosyayı güvenli bir yerde tutun ve gerçek production değerleri ile güncelleyin
 
 return [
@@ -27,6 +27,42 @@ return [
         'client_secret' => getenv('IKAS_CLIENT_SECRET') ?: 'your_client_secret',
         'api_token' => getenv('IKAS_API_TOKEN') ?: 'your_ikas_api_token',
         'test_mode' => true // Geçici olarak true yapıldı
+    ],
+    
+    // SiPay Ödeme Sistemi
+    'sipay' => [
+        'test_mode' => getenv('SIPAY_TEST_MODE') !== 'false', // Test modunda
+        'base_url' => getenv('SIPAY_BASE_URL') ?: 'https://provisioning.sipay.com.tr/ccpayment',
+        
+        // Test Üye İşyeri Bilgileri
+        'app_id' => getenv('SIPAY_APP_ID') ?: '6d4a7e9374a76c15260fcc75e315b0b9',
+        'app_secret' => getenv('SIPAY_APP_SECRET') ?: 'b46a67571aa1e7ef5641dc3fa6f1712a',
+        'merchant_key' => getenv('SIPAY_MERCHANT_KEY') ?: '$2y$10$HmRgYosneqcwHj.UH7upGuyCZqpQ1ITgSMj9Vvxn.t6f.Vdf2SQFO',
+        'merchant_id' => getenv('SIPAY_MERCHANT_ID') ?: '18309',
+        
+        // API URL'leri
+        'token_url' => '/api/token',
+        'payment_2d_url' => '/api/paySmart2D',
+        'payment_3d_url' => '/api/paySmart3D',
+        'complete_payment_url' => '/payment/complete',
+        'check_status_url' => '/api/checkstatus',
+        
+        // Güvenlik ve Diğer Ayarlar
+        'timeout' => 30, // Saniye
+        'currency' => 'TRY',
+        'payment_methods' => ['2D', '3D'],
+        'max_installments' => 12,
+        
+        // Webhook URL'leri
+        'webhook_url' => getenv('SIPAY_WEBHOOK_URL') ?: 'https://calformat.com.tr/sipay_webhook.php',
+        'return_url' => getenv('SIPAY_RETURN_URL') ?: 'https://calformat.com.tr/sipay_3d_return.php',
+        
+        // Test kartları (sadece test modunda kullanılır)
+        'test_cards' => [
+            'visa' => '4111111111111111',
+            'mastercard' => '5555555555554444',
+            'amex' => '378282246310005'
+        ]
     ],
     
     // Genel Ayarlar

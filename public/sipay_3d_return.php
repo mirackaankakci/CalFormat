@@ -1,153 +1,184 @@
 <?php
+/**
+ * SiPay 3D Return Handler
+ * 3D güvenli ödeme sonrası geri dönüş işleyicisi
+ * 
+ * Bu endpoint 3D ödeme tamamlandıktan sonra SiPay tarafından çağrılır
+ * Hash key doğrulaması yaparak güvenli sonuç döndürür
+ */
+
+// Güvenlik modülünü yükle
+require_once __DIR__ . '/security_new.php';
+
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+
 header('Content-Type: application/json; charset=utf-8');
 
 try {
-    // 1. SIPAY KONFIGÜRASYONU (Ana dosyayla uyumlu)
-    $sipayConfig = [
-        'app_id' => '6d4a7e9374a76c15260fcc75e315b0b9',
-        'app_secret' => 'b46a67571aa1e7ef5641dc3fa6f1712a',
-        'merchant_key' => '$2y$10$HmRgYosneqcwHj.UH7upGuyCZqpQ1ITgSMj9Vvxn.t6f.Vdf2SQFO',
-        'merchant_id' => '18309'
-    ];
+    // Konfigürasyonu yükle
+    define('INTERNAL_ACCESS', true);
+    $config = require_once __DIR__ . '/config.php';
+    $sipayConfig = $config['sipay'];
 
-    // 2. SIPAY HASH VALIDATION FONKSIYONU (Ana dosyayla uyumlu)
-    function validateSipayHash($postData, $app_secret) {
-        if (!isset($postData['hash_key'])) {
-            return [
-                'valid' => false,
-                'error' => 'Hash key not found in data'
-            ];
-        }
-
-        $hashKey = $postData['hash_key'];
+    /**
+     * Hash key doğrulama fonksiyonu
+     */
+    function validateHashKey($hashKey, $secretKey) {
         $status = $currencyCode = "";
         $total = $invoiceId = $orderId = 0;
 
         if (!empty($hashKey)) {
-            // URL güvenliği için '__' karakterini '/' ile değiştir
             $hashKey = str_replace('__', '/', $hashKey);
-            $password = sha1($app_secret);
+            $password = sha1($secretKey);
 
-            // Hash key parçalarını ayır: iv:salt:encrypted_data
             $components = explode(':', $hashKey);
-            if (count($components) >= 3) {
-                $iv = $components[0];
-                $salt = $components[1];
-                $saltWithPassword = hash('sha256', $password . $salt);
-                $encryptedMsg = $components[2];
+            if (count($components) > 2) {
+                $iv = $components[0] ?? "";
+                $salt = $components[1] ?? "";
+                $salt = hash('sha256', $password . $salt);
+                $encryptedMsg = $components[2] ?? "";
 
-                // AES-256-CBC ile çöz (PHP 8+ uyumlu)
-                $decryptedMsg = openssl_decrypt($encryptedMsg, 'aes-256-cbc', $saltWithPassword, 0, $iv);
+                $decryptedMsg = openssl_decrypt($encryptedMsg, 'aes-256-cbc', $salt, null, $iv);
 
                 if ($decryptedMsg && strpos($decryptedMsg, '|') !== false) {
-                    // Çözülmüş veriyi parse et
                     $array = explode('|', $decryptedMsg);
-                    $status = isset($array[0]) ? $array[0] : 0;
-                    $total = isset($array[1]) ? $array[1] : 0;
-                    $invoiceId = isset($array[2]) ? $array[2] : '0';
-                    $orderId = isset($array[3]) ? $array[3] : 0;
-                    $currencyCode = isset($array[4]) ? $array[4] : '';
+                    $status = $array[0] ?? 0;
+                    $total = $array[1] ?? 0;
+                    $invoiceId = $array[2] ?? '0';
+                    $orderId = $array[3] ?? 0;
+                    $currencyCode = $array[4] ?? '';
                 }
             }
         }
 
-        return [
-            'valid' => true,
-            'status' => $status,
-            'total' => $total,
-            'invoice_id' => $invoiceId,
-            'order_id' => $orderId,
-            'currency_code' => $currencyCode
-        ];
+        return [$status, $total, $invoiceId, $orderId, $currencyCode];
     }
 
-    // 3. 3D RETURN HANDLER (Güncellenmiş hash doğrulama)
-    function handle3DReturn($postData, $sipayConfig) {
-        // Hash validasyonu
-        $hashValidation = validateSipayHash($postData, $sipayConfig['app_secret']);
-        
-        if (!$hashValidation['valid']) {
-            return [
-                'success' => false,
-                'error' => 'Hash validation failed',
-                'message' => 'Geçersiz hash key - güvenlik doğrulaması başarısız',
-                'debug_info' => $hashValidation
-            ];
+    /**
+     * 3D Return işleyici
+     */
+    function handle3DReturn($postData, $config) {
+        // Gerekli parametreler var mı kontrol et
+        $requiredParams = ['sipay_status', 'invoice_id', 'hash_key'];
+        foreach ($requiredParams as $param) {
+            if (!isset($postData[$param])) {
+                throw new Exception("Eksik parametre: $param");
+            }
         }
 
-        // 3D Return verilerini işle
-        $returnData = [
+        // Hash key doğrulaması
+        list($status, $total, $invoiceId, $orderId, $currencyCode) = validateHashKey(
+            $postData['hash_key'], 
+            $config['app_secret']
+        );
+        
+        // Ödeme durumu analizi
+        $isSuccessful = ($postData['sipay_status'] == '1' && ($status == '1' || $status === 1));
+        
+        $result = [
             'success' => true,
-            'payment_status' => $hashValidation['status'],
-            'transaction_id' => $postData['order_no'] ?? $postData['order_id'] ?? '',
-            'invoice_id' => $hashValidation['invoice_id'],
-            'total' => $hashValidation['total'],
-            'currency_code' => $hashValidation['currency_code'],
-            'order_id' => $hashValidation['order_id'],
-            'payment_method' => $postData['payment_method'] ?? '1',
-            'card_no' => $postData['credit_card_no'] ?? '',
-            'status_description' => $postData['status_description'] ?? '',
-            'transaction_type' => $postData['transaction_type'] ?? '',
-            'md_status' => $postData['md_status'] ?? '',
-            'auth_code' => $postData['auth_code'] ?? '',
-            'hash_validated' => true,
-            'validation_type' => '3D_RETURN',
+            'payment_type' => '3D_RETURN',
+            'payment_successful' => $isSuccessful,
+            'payment_status' => $postData['sipay_status'],
+            'hash_validated' => !empty($status),
+            'transaction_data' => [
+                'sipay_status' => $postData['sipay_status'],
+                'order_no' => $postData['order_no'] ?? $postData['order_id'] ?? '',
+                'invoice_id' => $postData['invoice_id'],
+                'total' => $total,
+                'currency_code' => $currencyCode,
+                'status_description' => $postData['status_description'] ?? '',
+                'transaction_type' => $postData['transaction_type'] ?? '',
+                'payment_method' => $postData['payment_method'] ?? '',
+                'md_status' => $postData['md_status'] ?? '',
+                'auth_code' => $postData['auth_code'] ?? ''
+            ],
+            'validation' => [
+                'hash_status' => $status,
+                'hash_total' => $total,
+                'hash_invoice_id' => $invoiceId,
+                'hash_order_id' => $orderId,
+                'hash_currency' => $currencyCode
+            ],
             'timestamp' => date('Y-m-d H:i:s')
         ];
 
-        // 3D Return için status kontrolü (Sipay dokümantasyonu: 0 = başarısız, 1 = başarılı)
-        $status = $hashValidation['status'];
-        if ($status == '1' || $status === 1) {
-            $returnData['message'] = 'Ödeme başarıyla tamamlandı';
-            $returnData['payment_successful'] = true;
-            // Burada sipariş durumunu güncelleyebilirsiniz
-        } elseif ($status == '0' || $status === 0) {
-            $returnData['message'] = 'Ödeme başarısız: ' . ($postData['status_description'] ?? 'Bilinmeyen hata');
-            $returnData['payment_successful'] = false;
+        // Başarı durumuna göre ekstra bilgiler
+        if ($isSuccessful) {
+            $result['message'] = 'Ödeme başarıyla tamamlandı';
+            $result['next_action'] = 'redirect_success';
         } else {
-            $returnData['message'] = 'Bilinmeyen ödeme durumu: ' . $status;
-            $returnData['payment_successful'] = false;
+            $result['message'] = 'Ödeme başarısız oldu';
+            $result['next_action'] = 'redirect_cancel';
+            $result['error_details'] = [
+                'status_description' => $postData['status_description'] ?? 'Bilinmeyen hata',
+                'error_code' => $postData['error_code'] ?? '',
+                'original_bank_error' => $postData['original_bank_error_description'] ?? ''
+            ];
         }
 
-        return $returnData;
+        return $result;
     }
 
-    // 4. SADECE POST METODU KABUL ET
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        throw new Exception('Sadece POST metodu destekleniyor');
-    }
+    // İstek işleme
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // POST verilerini güvenli şekilde al
+        $postData = sanitizeInput($_POST);
+        
+        if (empty($postData)) {
+            $jsonData = getSecureJSONInput();
+            if ($jsonData) {
+                $postData = $jsonData;
+            }
+        }
 
-    // 5. FORM DATA'YI AL (3D return genelde form post olarak gelir)
-    $postData = $_POST;
-    
-    // 6. 3D RETURN İŞLEMİ
-    $result = handle3DReturn($postData, $sipayConfig);
-    
-    // Log 3D return data for debugging
-    error_log('Sipay 3D Return: ' . json_encode([
-        'received_data' => $postData,
-        'result' => $result,
-        'timestamp' => date('Y-m-d H:i:s')
-    ]));
+        if (empty($postData)) {
+            throw new Exception('3D Return verisi bulunamadı');
+        }
 
-    // Başarılı işlem için kullanıcıyı yönlendir veya sonuç sayfası göster
-    if ($result['success'] && ($result['payment_successful'] ?? false)) {
-        // Başarılı ödeme - kullanıcıyı başarı sayfasına yönlendir
-        header('Location: /checkout-success?invoice_id=' . urlencode($result['invoice_id']) . '&transaction_id=' . urlencode($result['transaction_id']));
-        exit;
-    } else {
-        // Başarısız ödeme - kullanıcıyı hata sayfasına yönlendir
-        $errorMessage = urlencode($result['message'] ?? 'Ödeme işlemi başarısız');
-        header('Location: /checkout-error?error=' . $errorMessage);
-        exit;
+        // URL'den gelen parametreleri de kontrol et
+        $urlParams = sanitizeInput($_GET);
+        $postData = array_merge($urlParams, $postData);
+
+        securityLog('3D Return POST request', 'INFO', [
+            'sipay_status' => $postData['sipay_status'] ?? '',
+            'invoice_id' => $postData['invoice_id'] ?? ''
+        ]);
+
+        $result = handle3DReturn($postData, $sipayConfig);
+        echo json_encode($result);
+
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        // URL parametrelerinden 3D return verilerini işle
+        $getParams = sanitizeInput($_GET);
+        
+        if (empty($getParams)) {
+            // API bilgisi döndür
+            echo json_encode([
+                'success' => true,
+                'service' => 'SiPay 3D Return Handler',
+                'description' => '3D güvenli ödeme sonrası geri dönüş işleyicisi',
+                'supported_methods' => ['GET', 'POST'],
+                'required_params' => ['sipay_status', 'invoice_id', 'hash_key'],
+                'timestamp' => date('Y-m-d H:i:s')
+            ]);
+        } else {
+            $result = handle3DReturn($getParams, $sipayConfig);
+            echo json_encode($result);
+        }
     }
 
 } catch (Exception $e) {
-    // Hata durumunda log ve kullanıcıyı hata sayfasına yönlendir
-    error_log('Sipay 3D Return Error: ' . $e->getMessage());
+    error_log('3D Return Error: ' . $e->getMessage());
     
-    $errorMessage = urlencode('3D ödeme işlemi sırasında hata: ' . $e->getMessage());
-    header('Location: /checkout-error?error=' . $errorMessage);
-    exit;
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'error' => $e->getMessage(),
+        'error_code' => '3D_RETURN_ERROR',
+        'payment_type' => '3D_RETURN',
+        'timestamp' => date('Y-m-d H:i:s')
+    ]);
 }
 ?>

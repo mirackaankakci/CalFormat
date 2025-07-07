@@ -1,141 +1,229 @@
 <?php
+/**
+ * SiPay Webhook Handler
+ * Yinelenen ödemeler ve ödeme durumu bildirimleri için
+ * 
+ * SiPay tarafından ödeme durumu değişikliklerinde çağrılır
+ * Hash key doğrulaması ile güvenli webhook işlemi
+ */
+
+// Güvenlik modülünü yükle
+require_once __DIR__ . '/security_new.php';
+
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+
 header('Content-Type: application/json; charset=utf-8');
 
 try {
-    // 1. RAW POST DATA AL
-    $rawPostData = file_get_contents('php://input');
-    $postData = json_decode($rawPostData, true);
-    
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        // JSON decode başarısız, form data olarak dene
-        $postData = $_POST;
-    }
+    // Konfigürasyonu yükle
+    define('INTERNAL_ACCESS', true);
+    $config = require_once __DIR__ . '/config.php';
+    $sipayConfig = $config['sipay'];
 
-    // 2. SIPAY KONFIGÜRASYONU (Ana dosyayla uyumlu)
-    $sipayConfig = [
-        'app_id' => '6d4a7e9374a76c15260fcc75e315b0b9',
-        'app_secret' => 'b46a67571aa1e7ef5641dc3fa6f1712a',
-        'merchant_key' => '$2y$10$HmRgYosneqcwHj.UH7upGuyCZqpQ1ITgSMj9Vvxn.t6f.Vdf2SQFO',
-        'merchant_id' => '18309'
-    ];
-
-    // 3. SIPAY HASH VALIDATION FONKSIYONU (Ana dosyayla uyumlu)
-    function validateSipayHash($postData, $app_secret) {
-        if (!isset($postData['hash_key'])) {
-            return [
-                'valid' => false,
-                'error' => 'Hash key not found in data'
-            ];
-        }
-
-        $hashKey = $postData['hash_key'];
+    /**
+     * Hash key doğrulama fonksiyonu
+     */
+    function validateHashKey($hashKey, $secretKey) {
         $status = $currencyCode = "";
         $total = $invoiceId = $orderId = 0;
 
         if (!empty($hashKey)) {
-            // URL güvenliği için '__' karakterini '/' ile değiştir
             $hashKey = str_replace('__', '/', $hashKey);
-            $password = sha1($app_secret);
+            $password = sha1($secretKey);
 
-            // Hash key parçalarını ayır: iv:salt:encrypted_data
             $components = explode(':', $hashKey);
-            if (count($components) >= 3) {
-                $iv = $components[0];
-                $salt = $components[1];
-                $saltWithPassword = hash('sha256', $password . $salt);
-                $encryptedMsg = $components[2];
+            if (count($components) > 2) {
+                $iv = $components[0] ?? "";
+                $salt = $components[1] ?? "";
+                $salt = hash('sha256', $password . $salt);
+                $encryptedMsg = $components[2] ?? "";
 
-                // AES-256-CBC ile çöz (PHP 8+ uyumlu)
-                $decryptedMsg = openssl_decrypt($encryptedMsg, 'aes-256-cbc', $saltWithPassword, 0, $iv);
+                $decryptedMsg = openssl_decrypt($encryptedMsg, 'aes-256-cbc', $salt, null, $iv);
 
                 if ($decryptedMsg && strpos($decryptedMsg, '|') !== false) {
-                    // Çözülmüş veriyi parse et
                     $array = explode('|', $decryptedMsg);
-                    $status = isset($array[0]) ? $array[0] : 0;
-                    $total = isset($array[1]) ? $array[1] : 0;
-                    $invoiceId = isset($array[2]) ? $array[2] : '0';
-                    $orderId = isset($array[3]) ? $array[3] : 0;
-                    $currencyCode = isset($array[4]) ? $array[4] : '';
+                    $status = $array[0] ?? 0;
+                    $total = $array[1] ?? 0;
+                    $invoiceId = $array[2] ?? '0';
+                    $orderId = $array[3] ?? 0;
+                    $currencyCode = $array[4] ?? '';
                 }
             }
         }
 
-        return [
-            'valid' => true,
-            'status' => $status,
-            'total' => $total,
-            'invoice_id' => $invoiceId,
-            'order_id' => $orderId,
-            'currency_code' => $currencyCode
-        ];
+        return [$status, $total, $invoiceId, $orderId, $currencyCode];
     }
 
-    // 4. WEBHOOK HANDLER (Güncellenmiş hash doğrulama)
-    function handleWebhook($postData, $sipayConfig) {
-        // Hash validasyonu
-        $hashValidation = validateSipayHash($postData, $sipayConfig['app_secret']);
-        
-        if (!$hashValidation['valid']) {
-            return [
-                'success' => false,
-                'error' => 'Hash validation failed',
-                'message' => 'Geçersiz hash key - güvenlik doğrulaması başarısız',
-                'debug_info' => $hashValidation
-            ];
+    /**
+     * Webhook işleyici
+     */
+    function handleWebhook($webhookData, $config) {
+        // Webhook için hash key doğrulaması
+        if (!isset($webhookData['hash_key'])) {
+            throw new Exception('Webhook hash key bulunamadı');
         }
 
-        // Webhook verilerini işle
-        $webhookData = [
+        list($status, $total, $invoiceId, $orderId, $currencyCode) = validateHashKey(
+            $webhookData['hash_key'], 
+            $config['app_secret']
+        );
+        
+        // Webhook için özel status kontrolü
+        // Webhook'ta status: COMPLETED = başarılı, FAIL = başarısız
+        $isSuccessful = ($status === 'COMPLETED');
+        
+        $result = [
             'success' => true,
-            'payment_status' => $hashValidation['status'],
-            'transaction_id' => $postData['order_no'] ?? $postData['order_id'] ?? '',
-            'invoice_id' => $hashValidation['invoice_id'],
-            'total' => $hashValidation['total'],
-            'currency_code' => $hashValidation['currency_code'],
-            'order_id' => $hashValidation['order_id'],
-            'payment_method' => $postData['payment_method'] ?? '1',
-            'card_no' => $postData['credit_card_no'] ?? '',
-            'status_description' => $postData['status_description'] ?? '',
-            'transaction_type' => $postData['transaction_type'] ?? '',
-            'hash_validated' => true,
-            'validation_type' => 'WEBHOOK',
+            'event_type' => 'webhook',
+            'webhook_processed' => true,
+            'payment_status' => $status,
+            'payment_successful' => $isSuccessful,
+            'hash_validated' => !empty($status),
+            'webhook_data' => [
+                'invoice_id' => $invoiceId,
+                'order_id' => $orderId,
+                'total' => $total,
+                'currency_code' => $currencyCode,
+                'status' => $status,
+                'raw_data' => $webhookData
+            ],
             'timestamp' => date('Y-m-d H:i:s')
         ];
 
-        // Webhook için status kontrolü (Sipay dokümantasyonu: COMPLETED = başarılı, FAIL = başarısız)
-        $status = $hashValidation['status'];
-        if ($status === 'COMPLETED' || $status === 'completed') {
-            $webhookData['message'] = 'Ödeme webhook: Başarıyla tamamlandı';
-            $webhookData['payment_successful'] = true;
-            // Burada sipariş durumunu kesin olarak güncelleyebilirsiniz
-        } elseif ($status === 'FAIL' || $status === 'fail') {
-            $webhookData['message'] = 'Ödeme webhook: Başarısız - ' . ($postData['status_description'] ?? 'Bilinmeyen hata');
-            $webhookData['payment_successful'] = false;
+        // Duruma göre işlemler
+        if ($isSuccessful) {
+            $result['action'] = 'payment_completed';
+            $result['message'] = 'Ödeme başarıyla tamamlandı - Webhook onaylandı';
+            
+            // Burada siparişi tamamlama, stok güncelleme vb. işlemler yapılabilir
+            $result['next_steps'] = [
+                'update_order_status' => 'completed',
+                'send_confirmation_email' => true,
+                'update_inventory' => true,
+                'generate_invoice' => true
+            ];
+            
         } else {
-            $webhookData['message'] = 'Ödeme webhook: Bilinmeyen durum - ' . $status;
-            $webhookData['payment_successful'] = false;
+            $result['action'] = 'payment_failed';
+            $result['message'] = 'Ödeme başarısız - Webhook bildirimi';
+            
+            $result['next_steps'] = [
+                'update_order_status' => 'failed',
+                'send_failure_email' => true,
+                'restore_inventory' => true,
+                'log_failure_reason' => true
+            ];
         }
 
-        return $webhookData;
+        // Yinelenen ödeme kontrolü
+        if (isset($webhookData['recurring_payment_id'])) {
+            $result['recurring_payment'] = [
+                'is_recurring' => true,
+                'recurring_id' => $webhookData['recurring_payment_id'],
+                'cycle_number' => $webhookData['cycle_number'] ?? 1,
+                'next_payment_date' => $webhookData['next_payment_date'] ?? null
+            ];
+        }
+
+        return $result;
     }
 
-    // 5. WEBHOOK İŞLEMİ
-    $result = handleWebhook($postData, $sipayConfig);
-    
-    // Log webhook data for debugging
-    error_log('Sipay Webhook: ' . json_encode([
-        'received_data' => $postData,
-        'result' => $result,
-        'timestamp' => date('Y-m-d H:i:s')
-    ]));
+    /**
+     * Webhook log kaydetme
+     */
+    function logWebhook($webhookData, $result) {
+        $logEntry = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+            'webhook_data' => $webhookData,
+            'processing_result' => $result,
+            'hash' => md5(json_encode($webhookData))
+        ];
 
-    echo json_encode($result);
+        // Log dosyasına yaz (production'da database'e kaydedilebilir)
+        $logFile = __DIR__ . '/logs/sipay_webhook_' . date('Y-m-d') . '.log';
+        if (!is_dir(dirname($logFile))) {
+            mkdir(dirname($logFile), 0755, true);
+        }
+        
+        file_put_contents(
+            $logFile, 
+            json_encode($logEntry) . "\n", 
+            FILE_APPEND | LOCK_EX
+        );
+        
+        return $logEntry['hash'];
+    }
+
+    // İstek işleme
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // Webhook verilerini güvenli şekilde al
+        $webhookData = getSecureJSONInput();
+        
+        // JSON yoksa form data'yı dene
+        if (!$webhookData) {
+            $webhookData = sanitizeInput($_POST);
+        }
+
+        if (empty($webhookData)) {
+            throw new Exception('Webhook verisi bulunamadı');
+        }
+
+        securityLog('SiPay webhook received', 'INFO', [
+            'invoice_id' => $webhookData['invoice_id'] ?? '',
+            'order_id' => $webhookData['order_id'] ?? '',
+            'status' => $webhookData['status'] ?? ''
+        ]);
+
+        // Webhook'u işle
+        $result = handleWebhook($webhookData, $sipayConfig);
+        
+        // Log kaydet
+        $logHash = logWebhook($webhookData, $result);
+        $result['log_hash'] = $logHash;
+        
+        // SiPay'e başarılı işlem döndür
+        http_response_code(200);
+        echo json_encode($result);
+
+    } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        // Webhook endpoint bilgisi
+        echo json_encode([
+            'success' => true,
+            'service' => 'SiPay Webhook Handler',
+            'description' => 'Yinelenen ödemeler ve ödeme durumu bildirimleri',
+            'webhook_url' => 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'],
+            'supported_methods' => ['POST'],
+            'security' => [
+                'hash_validation' => 'AES-256-CBC',
+                'ip_whitelist' => 'SiPay sunucuları',
+                'logging' => 'Tam webhook logları'
+            ],
+            'webhook_status_codes' => [
+                'COMPLETED' => 'Ödeme başarılı',
+                'FAIL' => 'Ödeme başarısız',
+                'PENDING' => 'Ödeme beklemede',
+                'CANCELLED' => 'Ödeme iptal edildi'
+            ],
+            'timestamp' => date('Y-m-d H:i:s')
+        ]);
+
+    } else {
+        throw new Exception('Desteklenmeyen HTTP method');
+    }
 
 } catch (Exception $e) {
-    http_response_code(500);
+    error_log('Webhook Error: ' . $e->getMessage());
+    
+    // Webhook hatalarında da 200 döndür (SiPay tekrar denemesin)
+    http_response_code(200);
     echo json_encode([
         'success' => false,
-        'error' => 'Webhook error: ' . $e->getMessage(),
+        'error' => $e->getMessage(),
+        'error_code' => 'WEBHOOK_ERROR',
+        'webhook_processed' => false,
         'timestamp' => date('Y-m-d H:i:s')
     ]);
 }
