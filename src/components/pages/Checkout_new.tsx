@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Shield, Check, User, MapPin, Loader2, Lock, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, CreditCard, Check, User, MapPin, Loader2, Lock, AlertCircle } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useAddress } from '../../hooks/useAddress';
-import sipayService, { SipayPaymentData } from '../../services/sipayService';
+import sipayService, { SiPayPaymentData } from '../../services/sipayService';
+import configService from '../../services/configService';
 
 const Checkout: React.FC = () => {
-  const navigate = useNavigate();
   const { items, clearCart } = useCart();
   const { 
     cities, 
@@ -27,6 +27,9 @@ const Checkout: React.FC = () => {
   const [orderData, setOrderData] = useState<any>(null);
   const [isCompany, setIsCompany] = useState(false);
   const [installmentOptions, setInstallmentOptions] = useState<any[]>([]);
+  const [paymentType, setPaymentType] = useState<'2D' | '3D'>('3D'); // Varsayılan olarak 3D güvenli
+  const [shippingCost, setShippingCost] = useState(0.0);
+  const [shippingThreshold, setShippingThreshold] = useState(0.0);
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -52,7 +55,7 @@ const Checkout: React.FC = () => {
   });
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = subtotal > 150 ? 0 : 29.90;
+  const shipping = subtotal > shippingThreshold ? 0 : shippingCost;
   const total = subtotal + shipping;
 
   // Taksit seçeneklerini yükle
@@ -61,35 +64,60 @@ const Checkout: React.FC = () => {
     setInstallmentOptions(options);
   }, [total]);
 
+  // Kargo ayarlarını yükle
+  useEffect(() => {
+    const loadShippingConfig = async () => {
+      try {
+        const config = await configService.getShippingConfig();
+        setShippingCost(config.default_shipping_cost);
+        setShippingThreshold(config.free_shipping_threshold);
+      } catch (error) {
+        console.error('Kargo ayarları yüklenemedi:', error);
+        // Varsayılan değerler zaten set
+      }
+    };
+
+    loadShippingConfig();
+  }, []);
+
   // URL parametrelerini kontrol et (Sipay dönüş)
   useEffect(() => {
     const checkPaymentResult = async () => {
       const urlParams = new URLSearchParams(window.location.search);
+      const status = urlParams.get('status');
+      const invoiceId = urlParams.get('invoice_id');
+      
+      // Sipay parametreleri (3D dönüş)
       const sipayStatus = urlParams.get('sipay_status');
       const orderNo = urlParams.get('order_no');
-      const invoiceId = urlParams.get('invoice_id');
 
-      if (sipayStatus && orderNo && invoiceId) {
-        if (sipayStatus === '1') {
-          // Ödeme başarılı
-          setOrderData({
-            success: true,
-            orderId: orderNo,
-            invoiceId: invoiceId,
-            orderSummary: {
-              items: items,
-              subtotal: subtotal,
-              shipping: shipping,
-              total: total
-            }
-          });
-          setActiveStep('onay');
-          clearCart();
-        } else {
-          // Ödeme başarısız
-          setOrderError('Ödeme işlemi başarısız oldu. Lütfen tekrar deneyin.');
-          setActiveStep('odeme');
-        }
+      // 3D ödeme başarılı dönüş
+      if ((status === 'success' || sipayStatus === '1') && invoiceId) {
+        console.log('✅ 3D ödeme başarılı!', { status, sipayStatus, invoiceId });
+        
+        setOrderData({
+          success: true,
+          orderId: orderNo || invoiceId,
+          invoiceId: invoiceId,
+          orderSummary: {
+            items: items,
+            subtotal: subtotal,
+            shipping: shipping,
+            total: total
+          }
+        });
+        setActiveStep('onay');
+        clearCart();
+        
+        // URL'yi temizle
+        window.history.replaceState({}, '', '/checkout');
+      } 
+      // 3D ödeme başarısız dönüş
+      else if ((status === 'failed' || status === 'cancel' || sipayStatus === '0') && invoiceId) {
+        console.log('❌ 3D ödeme başarısız!', { status, sipayStatus, invoiceId });
+        
+        setOrderError('3D güvenli ödeme işlemi başarısız oldu veya iptal edildi. Lütfen tekrar deneyin.');
+        setActiveStep('odeme');
         
         // URL'yi temizle
         window.history.replaceState({}, '', '/checkout');
@@ -97,7 +125,7 @@ const Checkout: React.FC = () => {
     };
 
     checkPaymentResult();
-  }, []);
+  }, [items, subtotal, shipping, total, clearCart]);
 
   const validateStep = (step: 'bilgiler' | 'odeme' | 'onay') => {
     if (step === 'bilgiler') {
@@ -181,12 +209,23 @@ const Checkout: React.FC = () => {
       // Sepet ürünlerini Sipay formatına çevir
       const cartItems = items.map(item => ({
         name: item.name,
-        price: item.price.toString(),
+        price: item.price,
         quantity: item.quantity,
         description: item.name
       }));
 
-      const paymentData: SipayPaymentData = {
+      // Kargo ücreti varsa items'e ekle
+      if (shipping > 0) {
+        cartItems.push({
+          name: 'Kargo',
+          price: shipping,
+          quantity: 1,
+          description: 'Kargo ücreti'
+        });
+      }
+
+      const paymentData: SiPayPaymentData = {
+        payment_type: paymentType,
         cc_holder_name: cardData.cardHolder,
         cc_no: cardData.cardNumber.replace(/\s/g, ''),
         expiry_month: cardData.expiryMonth.padStart(2, '0'),
@@ -199,9 +238,9 @@ const Checkout: React.FC = () => {
         name: formData.firstName,
         surname: formData.lastName,
         total: total,
-        items: JSON.stringify(cartItems),
-        cancel_url: `${window.location.origin}/checkout?status=cancel`,
-        return_url: `${window.location.origin}/checkout?status=success`,
+        items: cartItems,
+        cancel_url: `${window.location.origin}/sipay_3d_return.php`,
+        return_url: `${window.location.origin}/sipay_3d_return.php`,
         bill_address1: formData.address,
         bill_city: selectedNames.cityName,
         bill_state: selectedNames.districtName,
@@ -215,14 +254,48 @@ const Checkout: React.FC = () => {
 
       const result = await sipayService.processPayment(paymentData);
 
-      if (result.success && result.payment_status === 1) {
-        // Ödeme başarılı
+      console.log('📋 Sipay response:', result);
+
+      // Response success kontrolü - Sipay format'ına göre
+      const isPaymentSuccess = result.success && result.data && (
+        (result.data.status_code === 100) || // API level success
+        (result.data.sipay_status === 1) ||  // Payment level success
+        (result.data.data && result.data.data.sipay_status === 1) // Nested data success
+      );
+
+      if (isPaymentSuccess) {
+        // 3D ödeme için HTML response check
+        if (paymentData.payment_type === '3D' && result.data.form_html) {
+          // 3D ödeme için yeni pencerede form açma
+          const newWindow = window.open('', '_blank', 'width=600,height=700');
+          if (newWindow) {
+            newWindow.document.write(result.data.form_html);
+            newWindow.document.close();
+            
+            // 3D ödeme bekleme ekranı
+            setOrderError(null);
+            setIsProcessingPayment(false);
+            
+            // 3D ödeme sonucunu bekle
+            const checkInterval = setInterval(() => {
+              if (newWindow.closed) {
+                clearInterval(checkInterval);
+                // Sayfa yenilenmesini bekle
+                window.location.reload();
+              }
+            }, 1000);
+            
+            return;
+          }
+        }
+        
+        // 2D ödeme başarılı veya 3D ödeme tamamlandı
         console.log('✅ Sipay ödeme başarılı:', result);
         
         setOrderData({
           success: true,
           orderId: invoiceId,
-          transactionType: result.transaction_type,
+          transactionType: paymentData.payment_type || '2D',
           orderSummary: {
             items: items,
             subtotal: subtotal,
@@ -240,9 +313,28 @@ const Checkout: React.FC = () => {
         window.history.replaceState({}, '', '/checkout?status=success');
         
       } else {
-        // Ödeme başarısız
+        // Ödeme başarısız veya belirsiz durum
         console.warn('⚠️ Sipay ödeme başarısız:', result);
-        throw new Error(result.data?.message || 'Ödeme işlemi başarısız oldu');
+        
+        // Sipay hata mesajını göster
+        let errorMessage = 'Ödeme işlemi başarısız oldu';
+        
+        // Sipay response'dan hata mesajı al
+        if (result.data) {
+          if (result.data.status_description && result.data.status_description !== "Payment process successful") {
+            errorMessage = result.data.status_description;
+          } else if (result.data.error) {
+            errorMessage = result.data.error;
+          } else if (result.data.data && result.data.data.error) {
+            errorMessage = result.data.data.error;
+          }
+        } else if (result.error) {
+          errorMessage = result.error;
+        } else if (result.data && result.data.status_description) {
+          errorMessage = result.data.status_description;
+        }
+        
+        throw new Error(errorMessage);
       }
       
     } catch (error) {
@@ -628,6 +720,144 @@ const Checkout: React.FC = () => {
 
               {activeStep === 'odeme' && (
                 <div className="space-y-6">
+                  {/* Ödeme Tipi Seçimi */}
+                  <div className="bg-white rounded-lg shadow-sm border p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Lock className="w-5 h-5 text-orange-500" />
+                      <h3 className="text-lg font-semibold text-gray-900">Ödeme Güvenlik Seviyesi</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 3D Secure Ödeme (Önerilen) */}
+                      <div 
+                        className={`border-2 rounded-lg p-5 cursor-pointer transition-all relative ${
+                          paymentType === '3D' 
+                            ? 'border-green-500 bg-green-50' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        onClick={() => setPaymentType('3D')}
+                      >
+                        {paymentType === '3D' && (
+                          <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                            ✓ Seçildi
+                          </div>
+                        )}
+                        <div className="absolute top-3 right-3">
+                          <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
+                            ÖNERİLEN
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-3 mt-3">
+                          <input
+                            type="radio"
+                            name="paymentType"
+                            value="3D"
+                            checked={paymentType === '3D'}
+                            onChange={() => setPaymentType('3D')}
+                            className="text-green-500 focus:ring-green-500 mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-2xl">🛡️</span>
+                              <span className="font-semibold text-gray-900">3D Secure Ödeme</span>
+                            </div>
+                            <div className="space-y-1 text-sm text-gray-600">
+                              <div className="flex items-center gap-2">
+                                <Check className="w-4 h-4 text-green-500" />
+                                <span>SMS ile güvenlik doğrulaması</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Check className="w-4 h-4 text-green-500" />
+                                <span>Banka güvencesi altında</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Check className="w-4 h-4 text-green-500" />
+                                <span>Fraud koruması</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2D Hızlı Ödeme */}
+                      <div 
+                        className={`border-2 rounded-lg p-5 cursor-pointer transition-all ${
+                          paymentType === '2D' 
+                            ? 'border-orange-500 bg-orange-50' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        onClick={() => setPaymentType('2D')}
+                      >
+                        {paymentType === '2D' && (
+                          <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
+                            ✓ Seçildi
+                          </div>
+                        )}
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="radio"
+                            name="paymentType"
+                            value="2D"
+                            checked={paymentType === '2D'}
+                            onChange={() => setPaymentType('2D')}
+                            className="text-orange-500 focus:ring-orange-500 mt-1"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-2xl">⚡</span>
+                              <span className="font-semibold text-gray-900">Hızlı Ödeme</span>
+                            </div>
+                            <div className="space-y-1 text-sm text-gray-600">
+                              <div className="flex items-center gap-2">
+                                <Check className="w-4 h-4 text-orange-500" />
+                                <span>Anında işlem tamamlanır</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Check className="w-4 h-4 text-orange-500" />
+                                <span>SMS bekleme süresi yok</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4 text-yellow-500" />
+                                <span>Standart güvenlik seviyesi</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bilgilendirme Mesajları */}
+                    {paymentType === '3D' && (
+                      <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-green-900">3D Secure ile güvenli ödeme</p>
+                            <p className="text-xs text-green-700 mt-1">
+                              Ödeme işlemi sırasında bankanızdan gelecek SMS ile doğrulama yapacaksınız. 
+                              Bu ek güvenlik katmanı kartınızı yetkisiz kullanımlara karşı korur.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {paymentType === '2D' && (
+                      <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-5 h-5 text-orange-500 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-orange-900">Hızlı ödeme seçildi</p>
+                            <p className="text-xs text-orange-700 mt-1">
+                              Ödeme işlemi anında tamamlanacak, SMS doğrulaması olmayacak. 
+                              Güvenlik için kartınızı sadece güvendiğiniz sitelerde kullanın.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="bg-white rounded-lg shadow-sm border p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                       <CreditCard className="h-5 w-5" />
@@ -756,10 +986,12 @@ const Checkout: React.FC = () => {
                       {isProcessingPayment ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Ödeme İşleniyor...
+                          {paymentType === '3D' ? '3D Güvenli Ödeme İşleniyor...' : 'Hızlı Ödeme İşleniyor...'}
                         </>
                       ) : (
-                        `${total.toFixed(2)} ₺ Öde`
+                        <>
+                          {paymentType === '3D' ? '🛡️' : '⚡'} {total.toFixed(2)} ₺ {paymentType === '3D' ? 'Güvenli Öde' : 'Hızlı Öde'}
+                        </>
                       )}
                     </button>
                   </div>
@@ -846,8 +1078,12 @@ const Checkout: React.FC = () => {
                   <span>Kargo:</span>
                   <span>{shipping.toFixed(2)} ₺</span>
                 </div>
-                {shipping === 0 && (
+                {shipping === 0 ? (
                   <p className="text-xs text-green-600">🎉 Ücretsiz kargo!</p>
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    {(shippingThreshold - subtotal).toFixed(2)} ₺ daha alışveriş yapın, kargo ücretsiz olsun! 
+                  </p>
                 )}
                 <div className="border-t pt-2 flex justify-between text-lg font-semibold">
                   <span>Toplam:</span>

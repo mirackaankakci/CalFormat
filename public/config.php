@@ -32,13 +32,13 @@ return [
     // SiPay Ödeme Sistemi
     'sipay' => [
         'test_mode' => getenv('SIPAY_TEST_MODE') !== 'false', // Test modunda
-        'base_url' => getenv('SIPAY_BASE_URL') ?: 'https://provisioning.sipay.com.tr/ccpayment',
+        'base_url' => getenv('SIPAY_BASE_URL') ?: 'https://app.sipay.com.tr/ccpayment',
         
         // Test Üye İşyeri Bilgileri
-        'app_id' => getenv('SIPAY_APP_ID') ?: '6d4a7e9374a76c15260fcc75e315b0b9',
-        'app_secret' => getenv('SIPAY_APP_SECRET') ?: 'b46a67571aa1e7ef5641dc3fa6f1712a',
-        'merchant_key' => getenv('SIPAY_MERCHANT_KEY') ?: '$2y$10$HmRgYosneqcwHj.UH7upGuyCZqpQ1ITgSMj9Vvxn.t6f.Vdf2SQFO',
-        'merchant_id' => getenv('SIPAY_MERCHANT_ID') ?: '18309',
+        'app_id' => getenv('SIPAY_APP_ID') ?: 'e19759a62999b8df7d52eccfb4ef84ee',
+        'app_secret' => getenv('SIPAY_APP_SECRET') ?: 'd5b0fcc23409624afda95346573fe45e',
+        'merchant_key' => getenv('SIPAY_MERCHANT_KEY') ?: '$2y$10$FF.kEML08eIwoWrSBRNB6.k1LOnX6yekGmB3wjDTe6c22Aaent8US',
+        'merchant_id' => getenv('SIPAY_MERCHANT_ID') ?: '27386930',
         
         // API URL'leri
         'token_url' => '/api/token',
@@ -69,13 +69,13 @@ return [
     'general' => [
         'currency' => 'TRY',
         'default_shipping_cost' => 29.90,
-        'free_shipping_threshold' => 150.00,
+        'free_shipping_threshold' => 150.00, // ✅ Düzeltildi: 150₺ üzeri ücretsiz kargo
         'timezone' => 'Europe/Istanbul',
         'debug_mode' => getenv('DEBUG_MODE') === 'true'
     ],
     
     // Frontend URL
-    'frontend_url' => getenv('FRONTEND_URL') ?: 'http://localhost:5173/checkout',
+    'frontend_url' => getenv('FRONTEND_URL') ?: 'http://localhost:5173',
     
     // Güvenlik Ayarları
     'security' => [

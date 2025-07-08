@@ -39,7 +39,7 @@ try {
                 $salt = hash('sha256', $password . $salt);
                 $encryptedMsg = $components[2] ?? "";
 
-                $decryptedMsg = openssl_decrypt($encryptedMsg, 'aes-256-cbc', $salt, null, $iv);
+                $decryptedMsg = openssl_decrypt($encryptedMsg, 'aes-256-cbc', $salt, 0, $iv);
 
                 if ($decryptedMsg && strpos($decryptedMsg, '|') !== false) {
                     $array = explode('|', $decryptedMsg);

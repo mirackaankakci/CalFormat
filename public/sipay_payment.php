@@ -103,7 +103,7 @@ try {
         $salt = substr(sha1(mt_rand()), 0, 4);
         $saltWithPassword = hash('sha256', $password . $salt);
 
-        $encrypted = openssl_encrypt($data, 'aes-256-cbc', $saltWithPassword, null, $iv);
+        $encrypted = openssl_encrypt($data, 'aes-256-cbc', $saltWithPassword, 0, $iv);
         
         if ($encrypted === false) {
             throw new Exception('Hash key şifreleme hatası');
@@ -134,7 +134,7 @@ try {
                 $salt = hash('sha256', $password . $salt);
                 $encryptedMsg = $components[2] ?? "";
 
-                $decryptedMsg = openssl_decrypt($encryptedMsg, 'aes-256-cbc', $salt, null, $iv);
+                $decryptedMsg = openssl_decrypt($encryptedMsg, 'aes-256-cbc', $salt, 0, $iv);
 
                 if ($decryptedMsg && strpos($decryptedMsg, '|') !== false) {
                     $array = explode('|', $decryptedMsg);
@@ -155,18 +155,17 @@ try {
      * Hızlı ödeme - Direkt kart işlemi
      */
     function process2DPayment($paymentData, $token, $config) {
-        // 2D ödeme için de hash key gerekli
-        $hashKey = generateHashKey(
-            $paymentData['total'],
-            $paymentData['installments_number'],
-            $paymentData['currency_code'],
-            $paymentData['merchant_key'],
-            $paymentData['invoice_id'],
-            $config['app_secret']
-        );
+        // Items'i doğru formatta hazırla - Sipay ARRAY bekliyor!
+        if (is_string($paymentData['items'])) {
+            // Eğer string ise array'e çevir
+            $paymentData['items'] = json_decode($paymentData['items'], true) ?: [];
+        }
+        
+        // Items'in array olduğundan emin ol
+        if (!is_array($paymentData['items'])) {
+            $paymentData['items'] = [];
+        }
 
-        // Hash key'i payment data'ya ekle
-        $paymentData['hash_key'] = $hashKey;
         $paymentData['ip'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 
         // Debug: Ödeme verilerini logla (hassas bilgiler hariç)
@@ -178,21 +177,20 @@ try {
             'has_hash_key' => !empty($paymentData['hash_key']),
             'hash_key_length' => strlen($paymentData['hash_key']),
             'ip' => $paymentData['ip'],
-            'items_type' => gettype($paymentData['items']),
-            'items_content' => $paymentData['items']
+            'items_format' => is_string($paymentData['items']) ? 'JSON_STRING' : 'ARRAY'
         ]);
 
         $ch = curl_init();
         curl_setopt_array($ch, [
             CURLOPT_URL => $config['payment_2d_url'],
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => http_build_query($paymentData), // Form data olarak gönder
+            CURLOPT_POSTFIELDS => json_encode($paymentData), // JSON olarak gönder
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_TIMEOUT => 60,
             CURLOPT_HTTPHEADER => [
                 'Authorization: Bearer ' . $token,
-                'Content-Type: application/x-www-form-urlencoded', // Form data content type
+                'Content-Type: application/json', // JSON content type
                 'Accept: application/json',
                 'User-Agent: CalFormat-SiPay/1.0'
             ]
@@ -226,11 +224,19 @@ try {
             ]);
         }
         
+        // Sipay response format kontrolü
+        // status_code: 100 = başarılı, sipay_status: 1 = başarılı
+        $isSuccess = ($httpCode === 200 && $responseData && (
+            (isset($responseData['status_code']) && $responseData['status_code'] == 100) ||
+            (isset($responseData['data']['sipay_status']) && $responseData['data']['sipay_status'] == 1) ||
+            (isset($responseData['sipay_status']) && $responseData['sipay_status'] == 1)
+        ));
+        
         return [
-            'success' => ($httpCode === 200),
+            'success' => $isSuccess,
             'http_code' => $httpCode,
             'payment_type' => '2D',
-            'hash_key' => $hashKey,
+            'hash_key' => $paymentData['hash_key'],
             'response' => $responseData,
             'raw_response' => $response
         ];
@@ -241,20 +247,19 @@ try {
      * Güvenli ödeme - SMS doğrulama ile banka sayfasına yönlendirme
      */
     function process3DPayment($paymentData, $token, $config) {
-        // 3D ödeme için hash key oluştur
-        $hashKey = generateHashKey(
-            $paymentData['total'],
-            $paymentData['installments_number'],
-            $paymentData['currency_code'],
-            $paymentData['merchant_key'],
-            $paymentData['invoice_id'],
-            $config['app_secret']
-        );
+        // Items'i doğru formatta hazırla - Sipay ARRAY bekliyor!
+        if (is_string($paymentData['items'])) {
+            // Eğer string ise array'e çevir
+            $paymentData['items'] = json_decode($paymentData['items'], true) ?: [];
+        }
+        
+        // Items'in array olduğundan emin ol
+        if (!is_array($paymentData['items'])) {
+            $paymentData['items'] = [];
+        }
 
-        // 3D ödeme için özel parametreler
-        $paymentData['hash_key'] = $hashKey;
-        $paymentData['response_method'] = 'POST';
-        $paymentData['payment_completed_by'] = 'app'; // Otomatik tamamlama
+        // 3D ödeme için IP ekle
+        $paymentData['ip'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 
         // 3D ödeme HTML formu oluştur
         $formHtml = generate3DPaymentForm($paymentData, $config, $token);
@@ -264,7 +269,7 @@ try {
             'payment_type' => '3D',
             'form_html' => $formHtml,
             'redirect_needed' => true,
-            'hash_key' => $hashKey,
+            'hash_key' => $paymentData['hash_key'],
             'invoice_id' => $paymentData['invoice_id']
         ];
     }
@@ -278,7 +283,10 @@ try {
         
         // Tüm ödeme verilerini hidden input olarak ekle
         foreach ($paymentData as $key => $value) {
-            if (is_array($value)) {
+            if ($key === 'items' && is_array($value)) {
+                // Items array'ini JSON string'e çevir (sadece form için)
+                $value = json_encode($value);
+            } elseif (is_array($value)) {
                 $value = json_encode($value);
             }
             $formFields .= '<input type="hidden" name="' . htmlspecialchars($key) . '" value="' . htmlspecialchars($value) . '">' . "\n";
@@ -419,6 +427,65 @@ try {
     }
 
     /**
+     * Items array'ini doğrula ve total ile eşleştir
+     * Sipay API'si items toplamı ile invoice total'in eşit olmasını bekliyor
+     */
+    function validateAndFixItems($itemsArray, $total, $input) {
+        // Eğer items boşsa default item oluştur
+        if (empty($itemsArray)) {
+            return [
+                [
+                    'name' => $input['invoice_description'] ?? 'CalFormat Ürün',
+                    'price' => number_format($total, 4, '.', ''),
+                    'quantity' => 1,
+                    'description' => $input['invoice_description'] ?? 'CalFormat sipariş'
+                ]
+            ];
+        }
+        
+        // Mevcut items'lerin toplam fiyatını hesapla
+        $itemsTotal = 0;
+        $processedItems = [];
+        
+        foreach ($itemsArray as $item) {
+            $price = floatval($item['price'] ?? 0);
+            $quantity = intval($item['quantity'] ?? 1);
+            $itemTotal = $price * $quantity;
+            $itemsTotal += $itemTotal;
+            
+            $processedItems[] = [
+                'name' => $item['name'] ?? 'Ürün',
+                'price' => number_format($price, 4, '.', ''),
+                'quantity' => $quantity,
+                'description' => $item['description'] ?? ($item['name'] ?? 'Ürün')
+            ];
+        }
+        
+        // Eğer toplam fiyat farklıysa düzelt
+        if (abs($itemsTotal - $total) > 0.001) { // 0.001 toleransı
+            // Farkı hesapla
+            $difference = $total - $itemsTotal;
+            
+            // Eğer tek item varsa, fiyatını düzelt
+            if (count($processedItems) === 1) {
+                $processedItems[0]['price'] = number_format($total, 4, '.', '');
+            } else {
+                // Çoklu item varsa, fark için ayrı item ekle
+                if (abs($difference) > 0.001) {
+                    $processedItems[] = [
+                        'name' => $difference > 0 ? 'Kargo/Ek Ücret' : 'İndirim',
+                        'price' => number_format($difference, 4, '.', ''),
+                        'quantity' => 1,
+                        'description' => $difference > 0 ? 'Kargo ve ek ücretler' : 'İndirim uygulaması'
+                    ];
+                }
+            }
+        }
+        
+        return $processedItems;
+    }
+
+    /**
      * İstek işleyici - Ana endpoint router
      */
     $requestMethod = $_SERVER['REQUEST_METHOD'];
@@ -494,58 +561,97 @@ try {
         // Ödeme tipini belirle
         $paymentType = strtoupper($input['payment_type'] ?? '2D');
         
-        // Ödeme verilerini hazırla
+        // Ödeme verilerini hazırla - Sipay dokümantasyonuna göre
         $items = $input['items'] ?? [];
+        
+        // Items'i array olarak hazırla (JSON string değil!)
         if (is_string($items)) {
             $items = json_decode($items, true) ?: [];
         }
         
-        // Items'i SiPay dokümantasyonuna göre hazırla
         $itemsArray = is_array($items) ? $items : [];
+        $total = floatval($input['total'] ?? 0);
         
-        // Eğer items boşsa default item ekle
-        if (empty($itemsArray)) {
-            $itemsArray = [
-                [
-                    'name' => 'CalFormat Ürün',
-                    'price' => strval($input['total'] ?? 0),
-                    'quantity' => 1,
-                    'description' => $input['invoice_description'] ?? 'CalFormat ürün'
-                ]
-            ];
-        }
-        
-        // SiPay için items'i JSON string'e çevir
-        $itemsJsonString = json_encode($itemsArray);
+        // Items'i Sipay formatına göre hazırla ve total ile eşleştir
+        $itemsForSipay = validateAndFixItems($itemsArray, $total, $input);
         
         $paymentData = [
+            // Temel kart bilgileri (zorunlu)
             'cc_holder_name' => $input['cc_holder_name'] ?? '',
             'cc_no' => $input['cc_no'] ?? '',
             'expiry_month' => $input['expiry_month'] ?? '',
             'expiry_year' => $input['expiry_year'] ?? '',
             'cvv' => $input['cvv'] ?? '',
+            
+            // Ödeme bilgileri (zorunlu)
             'currency_code' => $input['currency_code'] ?? 'TRY',
             'installments_number' => intval($input['installments_number'] ?? 1),
             'invoice_id' => $input['invoice_id'] ?? 'CF-' . time() . '-' . rand(1000, 9999),
             'invoice_description' => $input['invoice_description'] ?? 'CalFormat Sipariş Ödemesi',
             'name' => $input['name'] ?? '',
             'surname' => $input['surname'] ?? '',
-            'total' => floatval($input['total'] ?? 0),
+            'total' => $total,
             'merchant_key' => $sipayConfig['merchant_key'],
-            'items' => $itemsJsonString, // JSON string olarak gönder
-            'cancel_url' => $input['cancel_url'] ?? 'https://calformat.com.tr/checkout?status=cancel',
-            'return_url' => $input['return_url'] ?? 'https://calformat.com.tr/checkout?status=success',
+            
+            // Items ARRAY olarak gönder (JSON string değil!)
+            'items' => $itemsForSipay,
+            
+            // URL'ler (zorunlu)
+            'cancel_url' => $input['cancel_url'] ?? 'https://calformat.com.tr/sipay_3d_return.php',
+            'return_url' => $input['return_url'] ?? 'https://calformat.com.tr/sipay_3d_return.php',
+            
+            // Fatura bilgileri 
             'bill_address1' => $input['bill_address1'] ?? '',
+            'bill_address2' => $input['bill_address2'] ?? '',
             'bill_city' => $input['bill_city'] ?? '',
             'bill_state' => $input['bill_state'] ?? '',
             'bill_postcode' => $input['bill_postcode'] ?? '',
             'bill_country' => $input['bill_country'] ?? 'TR',
-            'bill_email' => $input['bill_email'] ?? '',
-            'bill_phone' => $input['bill_phone'] ?? ''
+            'bill_email' => $input['bill_email'] ?? 'customer@calformat.com.tr',
+            'bill_phone' => $input['bill_phone'] ?? '',
+            
+            // İsteğe bağlı parametreler
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1',
+            'card_program' => $input['card_program'] ?? '',
+            'transaction_type' => $input['transaction_type'] ?? 'Auth',
+            'sale_web_hook_key' => $input['sale_web_hook_key'] ?? '',
+            
+            // Komisyon parametreleri (isteğe bağlı)
+            'is_commission_from_user' => $input['is_commission_from_user'] ?? '',
+            'commission_by' => $input['commission_by'] ?? '',
+            
+            // Yinelenen ödeme parametreleri (isteğe bağlı)
+            'order_type' => $input['order_type'] ?? '',
+            'recurring_payment_number' => $input['recurring_payment_number'] ?? '',
+            'recurring_payment_cycle' => $input['recurring_payment_cycle'] ?? '',
+            'recurring_payment_interval' => $input['recurring_payment_interval'] ?? '',
+            'recurring_web_hook_key' => $input['recurring_web_hook_key'] ?? '',
+            
+            // Tarım kartları için (isteğe bağlı)
+            'maturity_period' => $input['maturity_period'] ?? '',
+            'payment_frequency' => $input['payment_frequency'] ?? '',
+            
+            // Sigorta ödemeleri için (isteğe bağlı)
+            'vpos_type' => $input['vpos_type'] ?? '',
+            'identity_number' => $input['identity_number'] ?? ''
         ];
 
         // Ödeme tipine göre işlem
         if ($paymentType === '3D') {
+            // 3D ödemeler için ek parametreler
+            $paymentData['response_method'] = 'POST';
+            $paymentData['payment_completed_by'] = $input['payment_completed_by'] ?? 'app';
+            
+            // Hash key oluştur (3D için zorunlu)
+            $paymentData['hash_key'] = generateHashKey(
+                $paymentData['total'],
+                $paymentData['installments_number'],
+                $paymentData['currency_code'],
+                $paymentData['merchant_key'],
+                $paymentData['invoice_id'],
+                $sipayConfig['app_secret']
+            );
+            
             $result = process3DPayment($paymentData, $tokenData['token'], $sipayConfig);
             
             // 3D ödeme için HTML döndür
@@ -555,6 +661,16 @@ try {
                 exit();
             }
         } else {
+            // 2D ödemeler için hash key oluştur (zorunlu)
+            $paymentData['hash_key'] = generateHashKey(
+                $paymentData['total'],
+                $paymentData['installments_number'],
+                $paymentData['currency_code'],
+                $paymentData['merchant_key'],
+                $paymentData['invoice_id'],
+                $sipayConfig['app_secret']
+            );
+            
             $result = process2DPayment($paymentData, $tokenData['token'], $sipayConfig);
         }
 
@@ -570,8 +686,16 @@ try {
             ],
             'timestamp' => date('Y-m-d H:i:s')
         ]);
+    } else {
+        // Desteklenmeyen HTTP metodu
+        http_response_code(405);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Method not allowed',
+            'allowed_methods' => ['GET', 'POST']
+        ]);
     }
-
+    
 } catch (Exception $e) {
     error_log('SiPay API Error: ' . $e->getMessage());
     

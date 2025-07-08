@@ -10,7 +10,8 @@ import {
   Trash2, 
   Calendar,
   TrendingUp,
-  Activity
+  Activity,
+  Truck
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBlog } from '../../contexts/BlogContext';
@@ -138,6 +139,13 @@ const AdminDashboard: React.FC = () => {
             >
               <FileText className="w-5 h-5" />
               Tüm Blogları Görüntüle
+            </Link>
+            <Link
+              to="/admin/shipping-settings"
+              className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-6 py-3 rounded-xl hover:bg-blue-200 transition-all duration-300"
+            >
+              <Truck className="w-5 h-5" />
+              Kargo Ayarları
             </Link>
           </div>
         </div>

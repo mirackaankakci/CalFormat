@@ -11,50 +11,29 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // Adres PHP dosyaları için (PHP server public klasöründen çalışıyor)
-      '/ikas_cities.php': {
+      // Tüm PHP API istekleri için genel proxy
+      '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path
+        rewrite: (path) => path.replace(/^\/api/, '/public')
       },
-      '/ikas_districts.php': {
+      // Direkt PHP dosyaları için
+      '/*.php': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path
+        rewrite: (path) => `/public${path}`
       },
-      '/ikas_towns.php': {
+      // Sipay API'leri için özel routing
+      '/sipay_*.php': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path
+        rewrite: (path) => `/public${path}`
       },
-      // Ürün ve sipariş PHP dosyaları için (PHP server public klasöründen çalışıyor)
-      '/ikas_products.php': {
+      // Ikas API'leri için özel routing
+      '/ikas_*.php': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path
-      },
-      '/ikas_create_order.php': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        rewrite: (path) => path
-      },
-      // Token endpoint'i (PHP server public klasöründen çalışıyor)
-      '/get_token.php': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        rewrite: (path) => path
-      },
-      // Sipay ödeme endpoint'i
-      '/sipay_payment.php': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        rewrite: (path) => path
-      },
-      // Test API
-      '/test_api.php': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        rewrite: (path) => path
+        rewrite: (path) => `/public${path}`
       }
     }
   }

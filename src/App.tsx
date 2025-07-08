@@ -12,7 +12,7 @@ import CTASection from './components/sections/CTASection';
 import BlogPreviewSection from './components/sections/BlogPreviewSection'; // ✅ Ekleyin
 import FloatingElements from './components/ui/FloatingElements';
 import Cart from './components/pages/Cart';
-import Checkout from './components/pages/Checkout';
+import Checkout from './components/pages/Checkout_new';
 import PrivacyPolicy from './components/pages/PrivacyPolicy';
 import RefundPolicy from './components/pages/RefundPolicy';
 import DistanceSalesAgreement from './components/pages/DistanceSalesAgreement';
@@ -39,6 +39,7 @@ import Profile from './components/pages/Profile';
 import Unauthorized from './components/pages/Unauthorized';
 import VerifyEmail from './components/pages/VerifyEmail';
 import AdminDebug from './components/pages/AdminDebug';
+import AdminShippingSettings from './components/pages/AdminShippingSettings';
 
 
 // ✅ Blog migration script'i - geliştirme için
@@ -234,6 +235,8 @@ const AppContent = () => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/admin-login" element={<Login />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/test" element={<div className="p-8 text-center"><h1 className="text-2xl">Test Sayfası Çalışıyor!</h1></div>} />
           <Route 
             path="/admin/users" 
             element={
@@ -245,6 +248,16 @@ const AppContent = () => {
           
           {/* Debug route - geliştirme için */}
           <Route path="/admin/debug" element={<AdminDebug />} />
+          
+          {/* Admin Shipping Settings */}
+          <Route 
+            path="/admin/shipping-settings" 
+            element={
+              <ProtectedRoute requireAdmin={true}>
+                <AdminShippingSettings />
+              </ProtectedRoute>
+            } 
+          />
           
           {/* Public routes */}
           <Route path="/register" element={<Register />} />
