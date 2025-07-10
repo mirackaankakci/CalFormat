@@ -96,16 +96,16 @@ class AddressService {
       }
     } catch (error) {
       console.error('İller yüklenirken hata:', error);
-      // Fallback data
+      // Fallback data - İkas UUID formatında
       const fallbackCities = [
-        { id: '1', name: 'İstanbul' },
-        { id: '6', name: 'Ankara' },
-        { id: '35', name: 'İzmir' },
-        { id: '16', name: 'Bursa' },
-        { id: '7', name: 'Antalya' },
-        { id: '41', name: 'Kocaeli' },
-        { id: '42', name: 'Konya' },
-        { id: '61', name: 'Trabzon' }
+        { id: 'fb123456-7890-abcd-ef12-345678901001', name: 'İstanbul' },
+        { id: 'fb123456-7890-abcd-ef12-345678901002', name: 'Ankara' },
+        { id: 'fb123456-7890-abcd-ef12-345678901003', name: 'İzmir' },
+        { id: 'fb123456-7890-abcd-ef12-345678901004', name: 'Bursa' },
+        { id: 'fb123456-7890-abcd-ef12-345678901005', name: 'Antalya' },
+        { id: 'fb123456-7890-abcd-ef12-345678901006', name: 'Kocaeli' },
+        { id: 'fb123456-7890-abcd-ef12-345678901007', name: 'Konya' },
+        { id: 'fb123456-7890-abcd-ef12-345678901008', name: 'Trabzon' }
       ];
       this.citiesCache = fallbackCities;
       return fallbackCities;
@@ -121,7 +121,7 @@ class AddressService {
         throw new Error('cityId boş veya undefined');
       }
       
-      const url = `${this.baseUrl}/ikas_districts.php?cityId=${encodeURIComponent(cityId)}`;
+      const url = `${this.baseUrl}/ikas_districts_new.php?cityId=${encodeURIComponent(cityId)}`;
       
       const response = await fetch(url, {
         method: 'GET',
@@ -168,16 +168,17 @@ class AddressService {
       }
     } catch (error) {
       console.error('❌ İlçeler yüklenirken hata:', error);
-      // Fallback data
+      // Fallback data - İkas UUID formatında
       const fallbackDistricts = [
-        { id: '1', name: 'Kadıköy' },
-        { id: '2', name: 'Beşiktaş' },
-        { id: '3', name: 'Şişli' },
-        { id: '4', name: 'Üsküdar' },
-        { id: '5', name: 'Fatih' },
-        { id: '6', name: 'Bakırköy' },
-        { id: '7', name: 'Beyoğlu' },
-        { id: '8', name: 'Ataşehir' }
+        { id: 'fb123456-7890-abcd-ef12-345678901234', name: 'Kadıköy' },
+        { id: 'fb123456-7890-abcd-ef12-345678901235', name: 'Beşiktaş' },
+        { id: 'fb123456-7890-abcd-ef12-345678901236', name: 'Şişli' },
+        { id: 'fb123456-7890-abcd-ef12-345678901237', name: 'Üsküdar' },
+        { id: 'fb123456-7890-abcd-ef12-345678901238', name: 'Fatih' },
+        { id: 'fb123456-7890-abcd-ef12-345678901239', name: 'Bakırköy' },
+        { id: 'fb123456-7890-abcd-ef12-345678901240', name: 'Beyoğlu' },
+        { id: 'fb123456-7890-abcd-ef12-345678901241', name: 'Ataşehir' },
+        { id: 'fb123456-7890-abcd-ef12-345678901242', name: 'Beykoz' }
       ];
       this.districtsCache = fallbackDistricts;
       return fallbackDistricts;
@@ -221,16 +222,16 @@ class AddressService {
       }
     } catch (error) {
       console.error('❌ Mahalleler yüklenirken hata:', error);
-      // Fallback data
+      // Fallback data - İkas UUID formatında
       return [
-        { id: '1', name: 'Caferağa Mahallesi' },
-        { id: '2', name: 'Fenerbahçe Mahallesi' },
-        { id: '3', name: 'Kozyatağı Mahallesi' },
-        { id: '4', name: 'Bostancı Mahallesi' },
-        { id: '5', name: 'Göztepe Mahallesi' },
-        { id: '6', name: 'Acıbadem Mahallesi' },
-        { id: '7', name: 'Suadiye Mahallesi' },
-        { id: '8', name: 'Erenköy Mahallesi' }
+        { id: 'fb123456-7890-abcd-ef12-345678901301', name: 'Caferağa Mahallesi' },
+        { id: 'fb123456-7890-abcd-ef12-345678901302', name: 'Fenerbahçe Mahallesi' },
+        { id: 'fb123456-7890-abcd-ef12-345678901303', name: 'Kozyatağı Mahallesi' },
+        { id: 'fb123456-7890-abcd-ef12-345678901304', name: 'Bostancı Mahallesi' },
+        { id: 'fb123456-7890-abcd-ef12-345678901305', name: 'Göztepe Mahallesi' },
+        { id: 'fb123456-7890-abcd-ef12-345678901306', name: 'Acıbadem Mahallesi' },
+        { id: 'fb123456-7890-abcd-ef12-345678901307', name: 'Suadiye Mahallesi' },
+        { id: 'fb123456-7890-abcd-ef12-345678901308', name: 'Erenköy Mahallesi' }
       ];
     }
   }

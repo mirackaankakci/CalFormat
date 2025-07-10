@@ -7,7 +7,7 @@ import sipayService, { SiPayPaymentData } from '../../services/sipayService';
 import configService from '../../services/configService';
 
 const Checkout: React.FC = () => {
-  const { items, clearCart } = useCart();
+  const { items, clearCart, createOrder } = useCart();
   const { 
     cities, 
     districts, 
@@ -18,7 +18,8 @@ const Checkout: React.FC = () => {
     setSelectedCity,
     setSelectedDistrict,
     setSelectedTown,
-    getSelectedNames
+    getSelectedNames,
+    getSelectedAddressInfo
   } = useAddress();
   
   const [activeStep, setActiveStep] = useState<'bilgiler' | 'odeme' | 'onay'>('bilgiler');
@@ -95,17 +96,107 @@ const Checkout: React.FC = () => {
       if ((status === 'success' || sipayStatus === '1') && invoiceId) {
         console.log('✅ 3D ödeme başarılı!', { status, sipayStatus, invoiceId });
         
-        setOrderData({
-          success: true,
-          orderId: orderNo || invoiceId,
-          invoiceId: invoiceId,
-          orderSummary: {
-            items: items,
-            subtotal: subtotal,
-            shipping: shipping,
-            total: total
+        // localStorage'dan form verilerini oku
+        const savedData = localStorage.getItem('checkout_form_data');
+        if (savedData) {
+          try {
+            const { formData: savedFormData, selectedNames: savedSelectedNames, isCompany: savedIsCompany, selectedCity: savedSelectedCity, selectedDistrict: savedSelectedDistrict, selectedTown: savedSelectedTown } = JSON.parse(savedData);
+            
+            // Sipariş oluşturma API'sini çağır
+            console.log('📦 3D ödeme sonrası sipariş oluşturuluyor...');
+            
+            // Adres seçimi validasyonu
+            if (!savedSelectedCity || !savedSelectedDistrict) {
+              throw new Error('Adres bilgileri eksik');
+            }
+
+            // Adres bilgilerini parse et
+            const savedAddressInfo = {
+              city: { id: savedSelectedCity, name: savedSelectedNames.cityName },
+              district: { id: savedSelectedDistrict, name: savedSelectedNames.districtName },
+              town: { id: savedSelectedTown || '', name: savedSelectedNames.townName || '' }
+            };
+
+            const orderPayload = {
+              firstName: savedFormData.firstName,
+              lastName: savedFormData.lastName,
+              email: savedFormData.email,
+              phone: savedFormData.phone,
+              shippingAddress: savedFormData.address,
+              shippingAddressLine2: '',
+              shippingCity: savedAddressInfo.city.name,
+              shippingDistrict: savedAddressInfo.district.name,
+              shippingTown: savedAddressInfo.town.name,
+              shippingPostalCode: '34000',
+              shippingCityId: savedAddressInfo.city.id,
+              shippingDistrictId: savedAddressInfo.district.id,
+              shippingTownId: savedAddressInfo.town.id,
+              billingAddress: savedFormData.address,
+              billingAddressLine2: '',
+              billingCity: savedAddressInfo.city.name,
+              billingDistrict: savedAddressInfo.district.name,
+              billingPostalCode: '34000',
+              billingCityId: savedAddressInfo.city.id,
+              billingDistrictId: savedAddressInfo.district.id,
+              isCompany: savedIsCompany,
+              companyName: savedIsCompany ? savedFormData.companyName : '',
+              taxNumber: savedIsCompany ? savedFormData.taxNumber : '',
+              taxOffice: savedIsCompany ? savedFormData.taxOffice : '',
+              isDifferentBillingAddress: false
+            };
+            
+            const orderResult = await createOrder(orderPayload);
+            console.log('✅ 3D ödeme sonrası sipariş başarıyla oluşturuldu:', orderResult);
+            
+            setOrderData({
+              success: true,
+              orderId: orderResult.orderId || orderNo || invoiceId,
+              invoiceId: invoiceId,
+              orderSummary: {
+                items: items,
+                subtotal: subtotal,
+                shipping: shipping,
+                total: total
+              }
+            });
+            
+            // localStorage'ı temizle
+            localStorage.removeItem('checkout_form_data');
+            
+          } catch (orderError) {
+            console.error('❌ 3D ödeme sonrası sipariş oluşturma hatası:', orderError);
+            
+            setOrderData({
+              success: true,
+              orderId: orderNo || invoiceId,
+              invoiceId: invoiceId,
+              orderSummary: {
+                items: items,
+                subtotal: subtotal,
+                shipping: shipping,
+                total: total
+              },
+              orderError: 'Ödeme başarılı ancak sipariş kaydedilemedi. Lütfen müşteri hizmetleri ile iletişime geçin.'
+            });
+            
+            // localStorage'ı temizle
+            localStorage.removeItem('checkout_form_data');
           }
-        });
+        } else {
+          // Fallback: Form verisi yoksa basit sipariş kaydı
+          setOrderData({
+            success: true,
+            orderId: orderNo || invoiceId,
+            invoiceId: invoiceId,
+            orderSummary: {
+              items: items,
+              subtotal: subtotal,
+              shipping: shipping,
+              total: total
+            }
+          });
+        }
+        
         setActiveStep('onay');
         clearCart();
         
@@ -118,6 +209,9 @@ const Checkout: React.FC = () => {
         
         setOrderError('3D güvenli ödeme işlemi başarısız oldu veya iptal edildi. Lütfen tekrar deneyin.');
         setActiveStep('odeme');
+        
+        // localStorage'ı temizle
+        localStorage.removeItem('checkout_form_data');
         
         // URL'yi temizle
         window.history.replaceState({}, '', '/checkout');
@@ -137,8 +231,8 @@ const Checkout: React.FC = () => {
         return false;
       }
       
-      if (!selectedCity || !selectedDistrict || !selectedTown) {
-        setOrderError('Lütfen şehir, ilçe ve mahalle seçimi yapın');
+      if (!selectedCity || !selectedDistrict) {
+        setOrderError('Lütfen şehir ve ilçe seçimi yapın');
         return false;
       }
       
@@ -250,7 +344,15 @@ const Checkout: React.FC = () => {
         bill_phone: formData.phone
       };
 
-      console.log('🔄 Sipay ödeme işlemi başlatılıyor...', paymentData);
+      // 3D ödeme öncesi form verilerini localStorage'a kaydet
+      localStorage.setItem('checkout_form_data', JSON.stringify({
+        formData,
+        selectedNames,
+        isCompany,
+        selectedCity,
+        selectedDistrict,
+        selectedTown
+      }));
 
       const result = await sipayService.processPayment(paymentData);
 
@@ -292,19 +394,82 @@ const Checkout: React.FC = () => {
         // 2D ödeme başarılı veya 3D ödeme tamamlandı
         console.log('✅ Sipay ödeme başarılı:', result);
         
-        setOrderData({
-          success: true,
-          orderId: invoiceId,
-          transactionType: paymentData.payment_type || '2D',
-          orderSummary: {
-            items: items,
-            subtotal: subtotal,
-            shipping: shipping,
-            total: total,
-            address: selectedNames,
-            formData: formData
+        // Sipariş oluşturma API'sini çağır
+        try {
+          console.log('📦 Sipariş oluşturuluyor...');
+          
+          // Adres seçimi validasyonu
+          if (!selectedCity || !selectedDistrict) {
+            throw new Error('Lütfen il ve ilçe seçimi yapınız');
           }
-        });
+
+          const addressInfo = getSelectedAddressInfo();
+
+          const orderPayload = {
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            shippingAddress: formData.address,
+            shippingAddressLine2: '',
+            shippingCity: addressInfo.city.name,
+            shippingDistrict: addressInfo.district.name,
+            shippingTown: addressInfo.town.name,
+            shippingPostalCode: '34000',
+            shippingCityId: addressInfo.city.id,
+            shippingDistrictId: addressInfo.district.id,
+            shippingTownId: addressInfo.town.id,
+            billingAddress: formData.address, // Varsayılan olarak aynı adres
+            billingAddressLine2: '',
+            billingCity: addressInfo.city.name,
+            billingDistrict: addressInfo.district.name,
+            billingPostalCode: '34000',
+            billingCityId: addressInfo.city.id,
+            billingDistrictId: addressInfo.district.id,
+            isCompany: isCompany,
+            companyName: isCompany ? formData.companyName : '',
+            taxNumber: isCompany ? formData.taxNumber : '',
+            taxOffice: isCompany ? formData.taxOffice : '',
+            isDifferentBillingAddress: false
+          };
+          
+          const orderResult = await createOrder(orderPayload);
+          console.log('✅ Sipariş başarıyla oluşturuldu:', orderResult);
+          
+          setOrderData({
+            success: true,
+            orderId: orderResult.orderId || invoiceId,
+            invoiceId: invoiceId,
+            transactionType: paymentData.payment_type || '2D',
+            orderSummary: {
+              items: items,
+              subtotal: subtotal,
+              shipping: shipping,
+              total: total,
+              address: selectedNames,
+              formData: formData
+            }
+          });
+          
+        } catch (orderError) {
+          console.error('❌ Sipariş oluşturma hatası:', orderError);
+          // Ödeme başarılı ama sipariş oluşturulamadı durumu
+          setOrderData({
+            success: true,
+            orderId: invoiceId,
+            invoiceId: invoiceId,
+            transactionType: paymentData.payment_type || '2D',
+            orderSummary: {
+              items: items,
+              subtotal: subtotal,
+              shipping: shipping,
+              total: total,
+              address: selectedNames,
+              formData: formData
+            },
+            orderError: 'Ödeme başarılı ancak sipariş kaydedilemedi. Lütfen müşteri hizmetleri ile iletişime geçin.'
+          });
+        }
         
         setActiveStep('onay');
         clearCart();
@@ -632,15 +797,14 @@ const Checkout: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Mahalle *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Mahalle</label>
                         <select
                           value={selectedTown}
                           onChange={(e) => setSelectedTown(e.target.value)}
                           disabled={!selectedDistrict}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100"
-                          required
                         >
-                          <option value="">Mahalle seçin</option>
+                          <option value="">Mahalle seçin (isteğe bağlı)</option>
                           {towns.map(town => (
                             <option key={town.id} value={town.id}>{town.name}</option>
                           ))}

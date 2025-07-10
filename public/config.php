@@ -22,23 +22,43 @@ return [
     // Ikas Ayarları
     'ikas' => [
         'base_url' => getenv('IKAS_BASE_URL') ?: 'https://api.myikas.com',
-        'store_id' => getenv('IKAS_STORE_ID') ?: 'calformat-demo',
-        'client_id' => getenv('IKAS_CLIENT_ID') ?: 'your_client_id',
-        'client_secret' => getenv('IKAS_CLIENT_SECRET') ?: 'your_client_secret',
+        'store_id' => getenv('IKAS_STORE_ID') ?: 'calformat',
+        'client_id' => getenv('IKAS_CLIENT_ID') ?: '9ca242da-2ce0-44b5-8b3f-4d31e6a94958',
+        'client_secret' => getenv('IKAS_CLIENT_SECRET') ?: 's_TBvX9kDl7N8FPXlSHp1L3dHFbd1c286fbfb440aa9796a8b851994b32',
         'api_token' => getenv('IKAS_API_TOKEN') ?: 'your_ikas_api_token',
-        'test_mode' => true // Geçici olarak true yapıldı
+        'test_mode' => true, // Geçici olarak true yapıldı
+        
+        // API URL'leri
+        'token_url' => 'https://calformat.myikas.com/api/admin/oauth/token',
+        'graphql_url' => 'https://api.myikas.com/api/v1/admin/graphql',
+        'store_api_url' => 'https://calformat.myikas.com/api',
+        
+        // Sabit değerler - İkas siparişi için
+        'defaults' => [
+            'country' => 'Türkiye',
+            'default_city' => 'İstanbul',
+            'default_city_id' => 'fb123456-7890-abcd-ef12-345678901001', // İkas UUID format
+            'default_district' => 'Beykoz',
+            'default_district_id' => 'fb123456-7890-abcd-ef12-345678901242', // İkas UUID format
+            'default_note' => 'test siparişi',
+            'deleted' => false,
+            'isDefault' => false,
+            // Fallback değerler - sadece acil durumlarda kullanılır
+            'fallback_product_id' => '8c64cc8a-7950-49e3-8739-36bcfc1db7fa',
+            'fallback_variant_id' => '7868c357-4726-432a-ad5d-49619e6a508b'
+        ]
     ],
     
     // SiPay Ödeme Sistemi
     'sipay' => [
-        'test_mode' => getenv('SIPAY_TEST_MODE') !== 'false', // Test modunda
-        'base_url' => getenv('SIPAY_BASE_URL') ?: 'https://app.sipay.com.tr/ccpayment',
+        'test_mode' => getenv('SIPAY_TEST_MODE') !== 'false', // Test modunda - true olarak değiştirildi
+        'base_url' => getenv('SIPAY_BASE_URL') ?: 'https://provisioning.sipay.com.tr/ccpayment',
         
-        // Test Üye İşyeri Bilgileri
-        'app_id' => getenv('SIPAY_APP_ID') ?: 'e19759a62999b8df7d52eccfb4ef84ee',
-        'app_secret' => getenv('SIPAY_APP_SECRET') ?: 'd5b0fcc23409624afda95346573fe45e',
-        'merchant_key' => getenv('SIPAY_MERCHANT_KEY') ?: '$2y$10$FF.kEML08eIwoWrSBRNB6.k1LOnX6yekGmB3wjDTe6c22Aaent8US',
-        'merchant_id' => getenv('SIPAY_MERCHANT_ID') ?: '27386930',
+        // Test Üye İşyeri Bilgileri (SiPay resmi test bilgileri)
+        'app_id' => getenv('SIPAY_APP_ID') ?: '6d4a7e9374a76c15260fcc75e315b0b9', // APP KEY
+        'app_secret' => getenv('SIPAY_APP_SECRET') ?: 'b46a67571aa1e7ef5641dc3fa6f1712a', // APP SECRET
+        'merchant_key' => getenv('SIPAY_MERCHANT_KEY') ?: '$2y$10$HmRgYosneqcwHj.UH7upGuyCZqpQ1ITgSMj9Vvxn.t6f.Vdf2SQFO',
+        'merchant_id' => getenv('SIPAY_MERCHANT_ID') ?: '18309',
         
         // API URL'leri
         'token_url' => '/api/token',

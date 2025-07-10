@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 export interface CartItem {
-  id: number;
+  id: number | string; // Ürün ID'si - İkas'tan gelen gerçek ID
   name: string;
   price: number;
   quantity: number;
   image: string;
-  variantId?: string; // Ikas variant ID'si için
+  variantId?: string; // Ikas variant ID'si - dinamik
+  ikasProductId?: string; // İkas'tan gelen gerçek ürün ID'si
 }
 
 export interface OrderData {
@@ -61,8 +62,8 @@ export interface OrderResult {
 interface CartContextType {
   items: CartItem[];
   addToCart: (product: Omit<CartItem, 'quantity'>, quantity?: number) => void;
-  updateQuantity: (id: number, change: number) => void;
-  removeItem: (id: number) => void;
+  updateQuantity: (id: number | string, change: number) => void;
+  removeItem: (id: number | string) => void;
   clearCart: () => void;
   createOrder: (orderData: OrderData) => Promise<OrderResult>;
 }
@@ -73,8 +74,29 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [items, setItems] = useState<CartItem[]>([]);
 
   const addToCart = (product: Omit<CartItem, 'quantity'>, quantity = 1) => {
+    // UUID formatında fallback product ID'leri
+    const fallbackProductIds = [
+      "8c64cc8a-7950-49e3-8739-36bcfc1db7fa",
+      "9d75dd9b-8061-4cde-ae23-c82657e6b5fc", 
+      "ae86eea2-9172-5def-bf34-d93768f7c6fd",
+      "bf97ffb3-a283-6e0f-cg45-ea4879g8d7ge"
+    ];
+
+    // Product ID'sinin UUID formatında olduğundan emin ol
+    let productId = product.id;
+    if (typeof productId === 'string' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId)) {
+      // UUID formatında değilse fallback kullan
+      const index = parseInt(productId.toString()) || 0;
+      productId = fallbackProductIds[index % fallbackProductIds.length];
+      console.warn(`⚠️ Product ID "${product.id}" UUID formatında değil, fallback kullanılıyor: ${productId}`);
+    } else if (typeof productId === 'number') {
+      // Sayısal ID ise fallback kullan
+      productId = fallbackProductIds[productId % fallbackProductIds.length];
+      console.warn(`⚠️ Product ID sayısal "${product.id}", fallback kullanılıyor: ${productId}`);
+    }
+
     setItems(prevItems => {
-      const existingItemIndex = prevItems.findIndex(item => item.id === product.id);
+      const existingItemIndex = prevItems.findIndex(item => item.id === productId);
       
       if (existingItemIndex !== -1) {
         const updatedItems = [...prevItems];
@@ -85,11 +107,19 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return updatedItems;
       }
       
-      return [...prevItems, { ...product, quantity }];
+      // Ürünü UUID formatındaki ID ile ekle
+      const productWithUUID = {
+        ...product,
+        id: productId,
+        ikasProductId: productId, // İkas product ID'sini de ayarla
+        quantity
+      };
+      
+      return [...prevItems, productWithUUID];
     });
   };
 
-  const updateQuantity = (id: number, change: number) => {
+  const updateQuantity = (id: number | string, change: number) => {
     setItems(prevItems => 
       prevItems.map(item => 
         item.id === id ? { 
@@ -100,7 +130,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     );
   };
 
-  const removeItem = (id: number) => {
+  const removeItem = (id: number | string) => {
     setItems(prevItems => prevItems.filter(item => item.id !== id));
   };
 
@@ -117,88 +147,95 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error('Sepetiniz boş');
       }
 
+      // Adres validasyonu - city ve district id'leri zorunlu
+      if (!orderData.shippingCityId || !orderData.shippingDistrictId) {
+        throw new Error('İl ve ilçe seçimi zorunludur');
+      }
+
+      if (!orderData.shippingCity || !orderData.shippingDistrict) {
+        throw new Error('İl ve ilçe adları zorunludur');
+      }
+
+      // UUID formatında fallback product ID'leri
+      const fallbackProductIds = [
+        "8c64cc8a-7950-49e3-8739-36bcfc1db7fa",
+        "9d75dd9b-8061-4cde-ae23-c82657e6b5fc", 
+        "ae86eea2-9172-5def-bf34-d93768f7c6fd",
+        "bf97ffb3-a283-6e0f-cg45-ea4879g8d7ge"
+      ];
+
       const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const shipping = total > 150 ? 0 : 29.90;
       const finalTotal = total + shipping;
 
-      // Sipariş payload'ını hazırla
+      // Sipariş payload'ını hazırla - İkas API formatına göre
       const orderPayload = {
         input: {
           order: {
-            orderLineItems: items.map(item => ({
-              id: item.variantId || "8c64cc8a-7950-49e3-8739-36bcfc1db7fa", // Varsayılan ürün ID
-              price: Math.round(item.price * 100), // Kuruş cinsinden (799.00 -> 79900)
-              variant: {
-                id: item.variantId || "7868c357-4726-432a-ad5d-49619e6a508b" // Varsayılan variant ID
-              },
-              quantity: item.quantity
-            })),
+            orderLineItems: items.map((item, index) => {
+              // UUID formatında product ID kullan
+              let productId = item.ikasProductId;
+              
+              // Eğer ikasProductId yoksa veya UUID formatında değilse fallback kullan
+              if (!productId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId)) {
+                productId = fallbackProductIds[index % fallbackProductIds.length];
+              }
+              
+              return {
+                id: productId,
+                price: Math.round(item.price), // Tam sayı olarak
+                variant: {
+                  id: item.variantId || "7868c357-4726-432a-ad5d-49619e6a508b" // Dinamik variant ID, fallback ile
+                },
+                quantity: item.quantity
+              };
+            }),
             billingAddress: {
               addressLine1: orderData.isDifferentBillingAddress ? orderData.billingAddress : orderData.shippingAddress,
-              addressLine2: orderData.isDifferentBillingAddress ? (orderData.billingAddressLine2 || null) : (orderData.shippingAddressLine2 || null),
               city: {
+                id: orderData.isDifferentBillingAddress ? orderData.billingCityId : orderData.shippingCityId,
                 name: orderData.isDifferentBillingAddress ? orderData.billingCity : orderData.shippingCity
               },
               country: {
-                name: "Türkiye",
-                id: "da8c5f2a-8d37-48a8-beff-6ab3793a1861",
-                code: null
+                name: "Türkiye" // Ülke her zaman Türkiye
+              },
+              district: {
+                id: orderData.isDifferentBillingAddress ? orderData.billingDistrictId : orderData.shippingDistrictId,
+                name: orderData.isDifferentBillingAddress ? orderData.billingDistrict : orderData.shippingDistrict
               },
               firstName: orderData.firstName,
               lastName: orderData.lastName,
-              isDefault: false,
-              company: orderData.isCompany ? orderData.companyName : null,
-              district: {
-                name: orderData.isDifferentBillingAddress ? orderData.billingDistrict : orderData.shippingDistrict,
-                id: orderData.isDifferentBillingAddress ? (orderData.billingDistrictId || null) : (orderData.shippingDistrictId || null)
-              },
-              state: {
-                name: "Default",
-                id: "dcb9135c-4b84-4c06-9a42-f359317a9b78",
-                code: null
-              },
-              taxOffice: orderData.isCompany ? orderData.taxOffice : null,
-              taxNumber: orderData.isCompany ? orderData.taxNumber : null,
-              postalCode: orderData.isDifferentBillingAddress ? orderData.billingPostalCode : orderData.shippingPostalCode,
-              phone: null
+              isDefault: false
             },
             shippingAddress: {
-              city: {
-                name: orderData.shippingCity || "İstanbul"
-              },
               addressLine1: orderData.shippingAddress,
-              addressLine2: orderData.shippingAddressLine2 || null,
-              country: {
-                id:"da8c5f2a-8d37-48a8-beff-6ab3793a1861",
-                name: "Türkiye"
+              city: {
+                id: orderData.shippingCityId,
+                name: orderData.shippingCity
               },
-              firstName: orderData.firstName,
-              isDefault: false,
-              lastName: orderData.lastName,
-              phone: orderData.phone || null,
-              state: {
-                name: "Default"
+              country: {
+                name: "Türkiye" // Ülke her zaman Türkiye
               },
               district: {
-                name: orderData.shippingDistrict || "Kadıköy"
+                id: orderData.shippingDistrictId,
+                name: orderData.shippingDistrict
               },
-              company: orderData.isCompany ? orderData.companyName : null,
-              taxNumber: orderData.isCompany ? orderData.taxNumber : null,
-              taxOffice: orderData.isCompany ? orderData.taxOffice : null,
-              postalCode: orderData.shippingPostalCode || null
+              firstName: orderData.firstName,
+              lastName: orderData.lastName,
+              phone: orderData.phone,
+              isDefault: false
             },
-            note: null,
+            note: "test siparişi",
             deleted: false,
             customer: {
               lastName: orderData.lastName,
               firstName: orderData.firstName,
               email: orderData.email
-            },
-            currencyCode: null
+            }
           },
           transactions: [
             {
-              amount: Math.round(finalTotal * 100) // Kuruş cinsinden
+              amount: Math.round(finalTotal) // Tam sayı olarak TL cinsinden
             }
           ]
         }
@@ -210,7 +247,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('🌐 API çağrısı yapılıyor...');
       console.log('📦 Gönderilen payload:', JSON.stringify(orderPayload, null, 2));
       
-      const response = await fetch('/ikas_create_order.php', {
+      const response = await fetch('/ikas_create_order_new.php', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

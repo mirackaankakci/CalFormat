@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İkas Sipariş API - Düzeltilmiş Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section { 
+            border: 1px solid #ddd; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 5px; 
+            background: #f9f9f9;
+        }
+        .test-section h3 { 
+            margin: 0 0 15px 0; 
+            color: #333; 
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .test-button { 
+            background: #007bff; 
+            color: white; 
+            padding: 12px 25px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 10px 5px;
+            font-size: 14px;
+        }
+        .test-button:hover { background: #0056b3; }
+        .test-button.success { background: #28a745; }
+        .test-button.danger { background: #dc3545; }
+        .result { 
+            background: #f0f0f0; 
+            padding: 15px; 
+            margin: 15px 0; 
+            border-radius: 5px; 
+            border-left: 4px solid #007bff;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .result.success { border-left-color: #28a745; background: #d4edda; }
+        .result.error { border-left-color: #dc3545; background: #f8d7da; }
+        .payload-display {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .info { 
+            background: #d1ecf1; 
+            padding: 10px; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+            border-left: 4px solid #bee5eb;
+        }
+        .warning {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #ffeaa7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✅ İkas Sipariş API - Düzeltilmiş Test</h1>
+        
+        <div class="warning">
+            <strong>⚠️ Tespit Edilen Hatalar:</strong><br>
+            1. Şehir ve ülke bilgileri karışıktı (city: "Türkiye", country: "İstanbul")<br>
+            2. Eksik adres alanları (addressLine2, zipCode, district)<br>
+            3. Müşteri transaction tutarı çok düşük (4 TL)<br>
+            4. GraphQL mutation eksik alanlar
+        </div>
+
+        <div class="info">
+            <strong>✅ Düzeltmeler:</strong><br>
+            ✅ Şehir: "İstanbul", Ülke: "Türkiye" olarak düzeltildi<br>
+            ✅ Tüm adres alanları eklendi (addressLine2, zipCode, district)<br>
+            ✅ Gerçekçi fiyat hesaplaması (100 TL x 2 adet + kargo)<br>
+            ✅ GraphQL mutation tüm alanlarla genişletildi<br>
+            ✅ Fallback mekanizması güçlendirildi
+        </div>
+
+        <div class="test-section">
+            <h3>1. Düzeltilmiş Sipariş Testi</h3>
+            <p>Doğru formatta sipariş oluşturma testi</p>
+            <button class="test-button" onclick="testCorrectOrder()">Doğru Sipariş Test Et</button>
+            <div id="result-correct" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Gerçekçi Sipariş Testi</h3>
+            <p>Gerçek müşteri bilgileri ile test</p>
+            <button class="test-button" onclick="testRealisticOrder()">Gerçekçi Sipariş Test Et</button>
+            <div id="result-realistic" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Çoklu Ürün Testi</h3>
+            <p>Birden fazla ürün ile sipariş testi</p>
+            <button class="test-button" onclick="testMultipleItems()">Çoklu Ürün Test Et</button>
+            <div id="result-multiple" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Kargo Hesaplama Testi</h3>
+            <p>Farklı tutarlarda kargo hesaplama testi</p>
+            <button class="test-button" onclick="testShippingCalculation()">Kargo Hesaplama Test Et</button>
+            <div id="result-shipping" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Doğru Payload Görüntüleyici</h3>
+            <p>Düzeltilmiş sipariş payload'ı</p>
+            <button class="test-button success" onclick="showCorrectPayload()">Doğru Payload Göster</button>
+            <div id="payload-correct" class="payload-display" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Doğru sipariş payload oluşturma fonksiyonu
+        function createCorrectOrderPayload(customData = {}) {
+            const defaultPayload = {
+                input: {
+                    order: {
+                        orderLineItems: [
+                            {
+                                id: "8c64cc8a-7950-49e3-8739-36bcfc1db7fa",
+                                price: 100, // Gerçekçi fiyat
+                                variant: {
+                                    id: "7868c357-4726-432a-ad5d-49619e6a508b"
+                                },
+                                quantity: 2
+                            }
+                        ],
+                        billingAddress: {
+                            addressLine1: "Tokatköy Mah. Sultan Aziz Cad.",
+                            addressLine2: "No: 123 Daire: 5", // Eklendi
+                            city: {
+                                id: "34", // İstanbul il kodu
+                                name: "İstanbul" // Düzeltildi
+                            },
+                            country: {
+                                name: "Türkiye" // Düzeltildi
+                            },
+                            district: {
+                                id: "34-020", // Beykoz ilçe kodu
+                                name: "Beykoz" // Eklendi
+                            },
+                            firstName: "Miraç Kaan",
+                            lastName: "Kakcı",
+                            zipCode: "34820", // Eklendi
+                            isDefault: false
+                        },
+                        shippingAddress: {
+                            addressLine1: "Tokatköy Mah. Sultan Aziz Cad.",
+                            addressLine2: "No: 123 Daire: 5", // Eklendi
+                            city: {
+                                id: "34", // İstanbul il kodu
+                                name: "İstanbul" // Düzeltildi
+                            },
+                            country: {
+                                name: "Türkiye" // Düzeltildi
+                            },
+                            district: {
+                                id: "34-020", // Beykoz ilçe kodu
+                                name: "Beykoz"
+                            },
+                            firstName: "Miraç Kaan",
+                            lastName: "Kakcı",
+                            phone: "05355570405",
+                            zipCode: "34820", // Eklendi
+                            isDefault: false
+                        },
+                        note: "test siparişi",
+                        deleted: false,
+                        customer: {
+                            lastName: "Kakcı",
+                            firstName: "Miraç Kaan",
+                            email: "kaankakci2@gmail.com"
+                        }
+                    },
+                    transactions: [
+                        {
+                            amount: 230 // 100*2 + 30 kargo = 230 TL (gerçekçi)
+                        }
+                    ]
+                }
+            };
+
+            // Custom data ile merge et
+            return { ...defaultPayload, ...customData };
+        }
+
+        async function makeAPIRequest(payload, testName) {
+            const startTime = Date.now();
+            
+            try {
+                console.log(`🚀 ${testName} başlatıldı...`);
+                
+                const response = await fetch('/ikas_create_order.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'omit',
+                    body: JSON.stringify(payload),
+                    signal: AbortSignal.timeout(30000)
+                });
+
+                const responseTime = Date.now() - startTime;
+                const responseText = await response.text();
+                
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (parseError) {
+                    result = {
+                        error: 'JSON Parse Error',
+                        raw_response: responseText.substring(0, 500),
+                        parse_error: parseError.message
+                    };
+                }
+
+                return {
+                    success: response.ok,
+                    status: response.status,
+                    statusText: response.statusText,
+                    responseTime: responseTime,
+                    data: result,
+                    headers: Object.fromEntries(response.headers.entries())
+                };
+
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                return {
+                    success: false,
+                    error: error.message,
+                    responseTime: responseTime
+                };
+            }
+        }
+
+        async function testCorrectOrder() {
+            const resultDiv = document.getElementById('result-correct');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.textContent = '⏳ Düzeltilmiş sipariş test ediliyor...';
+
+            const payload = createCorrectOrderPayload();
+            const result = await makeAPIRequest(payload, 'Düzeltilmiş Sipariş');
+            
+            resultDiv.className = result.success ? 'result success' : 'result error';
+            resultDiv.textContent = `📊 Düzeltilmiş Sipariş Test Sonucu (${result.responseTime}ms):
+            
+Status: ${result.status} ${result.statusText}
+Success: ${result.success}
+
+🔍 Düzeltilen Hatalar:
+✅ Şehir/Ülke bilgileri düzeltildi
+✅ Eksik adres alanları eklendi
+✅ Gerçekçi fiyat hesaplaması
+✅ GraphQL mutation genişletildi
+
+Response Data:
+${JSON.stringify(result.data, null, 2)}
+
+${result.data?.success ? '🎉 Sipariş başarıyla oluşturuldu!' : '❌ Hata oluştu'}
+${result.data?.fallback_mode ? '⚠️ Fallback mode devrede' : ''}`;
+        }
+
+        async function testRealisticOrder() {
+            const resultDiv = document.getElementById('result-realistic');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.textContent = '⏳ Gerçekçi sipariş test ediliyor...';
+
+            const realisticPayload = createCorrectOrderPayload({
+                input: {
+                    order: {
+                        orderLineItems: [
+                            {
+                                id: "8c64cc8a-7950-49e3-8739-36bcfc1db7fa",
+                                price: 299, // CalFormat ürün fiyatı
+                                variant: {
+                                    id: "7868c357-4726-432a-ad5d-49619e6a508b"
+                                },
+                                quantity: 1
+                            }
+                        ],
+                        billingAddress: {
+                            addressLine1: "Atatürk Caddesi No: 45",
+                            addressLine2: "Apt: Park Residence Daire: 12",
+                            city: { 
+                                id: "34", // İstanbul il kodu
+                                name: "İstanbul" 
+                            },
+                            country: { name: "Türkiye" },
+                            district: { 
+                                id: "34-025", // Şişli ilçe kodu
+                                name: "Şişli" 
+                            },
+                            firstName: "Ahmet",
+                            lastName: "Yılmaz",
+                            zipCode: "34394",
+                            isDefault: false
+                        },
+                        shippingAddress: {
+                            addressLine1: "İş Merkezi 42. Sokak",
+                            addressLine2: "Plaza A Blok Kat: 5",
+                            city: { 
+                                id: "34", // İstanbul il kodu
+                                name: "İstanbul" 
+                            },
+                            country: { name: "Türkiye" },
+                            district: { 
+                                id: "34-024", // Levent (Beşiktaş alt ilçesi)
+                                name: "Levent" 
+                            },
+                            firstName: "Ahmet",
+                            lastName: "Yılmaz",
+                            phone: "05321234567",
+                            zipCode: "34330",
+                            isDefault: false
+                        },
+                        note: "Ofise teslimat, 09:00-17:00 arası",
+                        deleted: false,
+                        customer: {
+                            lastName: "Yılmaz",
+                            firstName: "Ahmet",
+                            email: "ahmet.yilmaz@example.com"
+                        }
+                    },
+                    transactions: [
+                        {
+                            amount: 329 // 299 + 30 kargo
+                        }
+                    ]
+                }
+            });
+
+            const result = await makeAPIRequest(realisticPayload, 'Gerçekçi Sipariş');
+            
+            resultDiv.className = result.success ? 'result success' : 'result error';
+            resultDiv.textContent = `📊 Gerçekçi Sipariş Test Sonucu (${result.responseTime}ms):
+            
+Status: ${result.status} ${result.statusText}
+Success: ${result.success}
+
+🏢 Gerçekçi Senaryo:
+- CalFormat takvim ürünü
+- Farklı fatura/teslimat adresi
+- Ofis teslimatı
+- Notlu sipariş
+
+Response Data:
+${JSON.stringify(result.data, null, 2)}`;
+        }
+
+        async function testMultipleItems() {
+            const resultDiv = document.getElementById('result-multiple');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.textContent = '⏳ Çoklu ürün testi yapılıyor...';
+
+            const multiPayload = createCorrectOrderPayload({
+                input: {
+                    order: {
+                        orderLineItems: [
+                            {
+                                id: "8c64cc8a-7950-49e3-8739-36bcfc1db7fa",
+                                price: 299,
+                                variant: { id: "7868c357-4726-432a-ad5d-49619e6a508b" },
+                                quantity: 2
+                            },
+                            {
+                                id: "future-product-wall-calendar",
+                                price: 199,
+                                variant: { id: "variant-wall-calendar-2025" },
+                                quantity: 1
+                            }
+                        ],
+                        // ... aynı adres bilgileri
+                    },
+                    transactions: [
+                        {
+                            amount: 827 // (299*2) + 199 + 30 kargo = 827
+                        }
+                    ]
+                }
+            });
+
+            const result = await makeAPIRequest(multiPayload, 'Çoklu Ürün');
+            
+            resultDiv.className = result.success ? 'result success' : 'result error';
+            resultDiv.textContent = `📊 Çoklu Ürün Test Sonucu (${result.responseTime}ms):
+            
+Status: ${result.status} ${result.statusText}
+Success: ${result.success}
+
+🛍️ Çoklu Ürün:
+- 2x CalFormat Premium (299₺)
+- 1x Duvar Takvimi (199₺)
+- Kargo: 30₺
+- Toplam: 827₺
+
+Response Data:
+${JSON.stringify(result.data, null, 2)}`;
+        }
+
+        async function testShippingCalculation() {
+            const resultDiv = document.getElementById('result-shipping');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.textContent = '⏳ Kargo hesaplama testi yapılıyor...';
+
+            // Ücretsiz kargo testi (150₺ üzeri)
+            const freeShippingPayload = createCorrectOrderPayload({
+                input: {
+                    order: {
+                        orderLineItems: [
+                            {
+                                id: "8c64cc8a-7950-49e3-8739-36bcfc1db7fa",
+                                price: 299,
+                                variant: { id: "7868c357-4726-432a-ad5d-49619e6a508b" },
+                                quantity: 1
+                            }
+                        ]
+                    },
+                    transactions: [
+                        {
+                            amount: 299 // Kargo ücretsiz olmalı (150₺ üzeri)
+                        }
+                    ]
+                }
+            });
+
+            const result = await makeAPIRequest(freeShippingPayload, 'Ücretsiz Kargo');
+            
+            resultDiv.className = result.success ? 'result success' : 'result error';
+            resultDiv.textContent = `📊 Kargo Hesaplama Test Sonucu (${result.responseTime}ms):
+            
+Status: ${result.status} ${result.statusText}
+Success: ${result.success}
+
+📦 Kargo Hesaplama:
+- Ürün Tutarı: 299₺
+- 150₺ üzeri ücretsiz kargo
+- Kargo: 0₺ (ücretsiz)
+- Toplam: 299₺
+
+Response Data:
+${JSON.stringify(result.data, null, 2)}`;
+        }
+
+        function showCorrectPayload() {
+            const payloadDiv = document.getElementById('payload-correct');
+            payloadDiv.style.display = 'block';
+
+            const correctPayload = createCorrectOrderPayload();
+
+            payloadDiv.textContent = `📦 Düzeltilmiş İkas Sipariş Payload:
+
+${JSON.stringify(correctPayload, null, 2)}
+
+🔍 Düzeltilen Hatalar:
+✅ city: "İstanbul" (önceden "Türkiye" yanlışı)
+✅ country: "Türkiye" (önceden "İstanbul" yanlışı)
+✅ addressLine2 eklendi
+✅ zipCode eklendi
+✅ district bilgisi düzenlendi
+✅ Gerçekçi amount (230₺ = 100*2 + 30 kargo)
+
+📋 GraphQL Mutation:
+mutation CreateOrderWithTransactions($input: CreateOrderWithTransactionsInput!) {
+  createOrderWithTransactions(input: $input) {
+    id
+    orderNumber
+    totalAmount
+    status
+    customer { id email firstName lastName }
+    orderLineItems {
+      id quantity price
+      variant { id sku product { id name } }
+    }
+    billingAddress {
+      firstName lastName addressLine1 addressLine2
+      city { id name } country { name } district { id name }
+      zipCode isDefault
+    }
+    shippingAddress {
+      firstName lastName addressLine1 addressLine2
+      city { id name } country { name } district { id name }
+      phone zipCode isDefault
+    }
+    transactions { id amount status transactionType }
+    note deleted createdAt updatedAt
+  }
+}`;
+        }
+
+        // Sayfa yüklendiğinde
+        console.log('✅ İkas Sipariş API - Düzeltilmiş test sayfası yüklendi');
+        console.log('🚀 Testleri başlatmak için butonlara tıklayın');
+    </script>
+</body>
+</html>

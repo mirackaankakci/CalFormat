@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İkas Sipariş API - İl/İlçe ID'li Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section { 
+            border: 1px solid #ddd; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 5px; 
+            background: #f9f9f9;
+        }
+        .test-section h3 { 
+            margin: 0 0 15px 0; 
+            color: #333; 
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .test-button { 
+            background: #007bff; 
+            color: white; 
+            padding: 12px 25px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin: 10px 5px;
+            font-size: 14px;
+        }
+        .test-button:hover { background: #0056b3; }
+        .test-button.success { background: #28a745; }
+        .test-button.danger { background: #dc3545; }
+        .result { 
+            background: #f0f0f0; 
+            padding: 15px; 
+            margin: 15px 0; 
+            border-radius: 5px; 
+            border-left: 4px solid #007bff;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .result.success { border-left-color: #28a745; background: #d4edda; }
+        .result.error { border-left-color: #dc3545; background: #f8d7da; }
+        .payload-display {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .info { 
+            background: #d1ecf1; 
+            padding: 10px; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+            border-left: 4px solid #bee5eb;
+        }
+        .success-info {
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #c3e6cb;
+        }
+        .cities-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        .cities-table th, .cities-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .cities-table th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🆔 İkas Sipariş API - İl/İlçe ID'li Test</h1>
+        
+        <div class="success-info">
+            <strong>✅ Güncellemeler Tamamlandı:</strong><br>
+            ✅ CartContext'te city ve district ID'leri eklendi<br>
+            ✅ GraphQL mutation'da ID alanları eklendi<br>
+            ✅ Input validation'da ID kontrolü eklendi<br>
+            ✅ Config.php'de varsayılan ID'ler tanımlandı<br>
+            ✅ Test dosyaları ID'lerle güncellendi
+        </div>
+
+        <div class="info">
+            <strong>📍 İl/İlçe ID Formatı:</strong><br>
+            🏙️ <strong>İl ID:</strong> 2 haneli il plaka kodu (örn: "34" İstanbul)<br>
+            🏘️ <strong>İlçe ID:</strong> il_kodu-ilçe_sıra (örn: "34-020" Beykoz)<br>
+            📋 <strong>Zorunlu Alanlar:</strong> city.id, city.name, district.id, district.name
+        </div>
+
+        <div class="test-section">
+            <h3>📍 Örnek İl/İlçe Kodları</h3>
+            <table class="cities-table">
+                <thead>
+                    <tr>
+                        <th>İl</th>
+                        <th>İl ID</th>
+                        <th>İlçe</th>
+                        <th>İlçe ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>İstanbul</td>
+                        <td>34</td>
+                        <td>Beykoz</td>
+                        <td>34-020</td>
+                    </tr>
+                    <tr>
+                        <td>İstanbul</td>
+                        <td>34</td>
+                        <td>Şişli</td>
+                        <td>34-025</td>
+                    </tr>
+                    <tr>
+                        <td>İstanbul</td>
+                        <td>34</td>
+                        <td>Kadıköy</td>
+                        <td>34-015</td>
+                    </tr>
+                    <tr>
+                        <td>Ankara</td>
+                        <td>06</td>
+                        <td>Çankaya</td>
+                        <td>06-008</td>
+                    </tr>
+                    <tr>
+                        <td>İzmir</td>
+                        <td>35</td>
+                        <td>Konak</td>
+                        <td>35-015</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="test-section">
+            <h3>1. İstanbul/Beykoz ID'li Sipariş Testi</h3>
+            <p>Varsayılan city ve district ID'leri ile test</p>
+            <button class="test-button" onclick="testIstanbulBeykoz()">İstanbul/Beykoz Test Et</button>
+            <div id="result-istanbul" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. İstanbul/Şişli ID'li Sipariş Testi</h3>
+            <p>Farklı ilçe ID'si ile test</p>
+            <button class="test-button" onclick="testIstanbulSisli()">İstanbul/Şişli Test Et</button>
+            <div id="result-sisli" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Ankara/Çankaya ID'li Sipariş Testi</h3>
+            <p>Farklı il ID'si ile test</p>
+            <button class="test-button" onclick="testAnkaraCankaya()">Ankara/Çankaya Test Et</button>
+            <div id="result-ankara" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Eksik ID Validation Testi</h3>
+            <p>ID'leri eksik bırakarak validation testi</p>
+            <button class="test-button danger" onclick="testMissingIds()">Eksik ID Test Et</button>
+            <div id="result-missing" class="result" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Tam Kapsamlı Payload Görüntüleyici</h3>
+            <p>ID'li sipariş payload'ının tam örneği</p>
+            <button class="test-button success" onclick="showFullPayloadWithIds()">ID'li Payload Göster</button>
+            <div id="payload-full" class="payload-display" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // İl/İlçe ID'li sipariş payload oluşturma fonksiyonu
+        function createOrderPayloadWithIds(cityId, cityName, districtId, districtName) {
+            return {
+                input: {
+                    order: {
+                        orderLineItems: [
+                            {
+                                id: "8c64cc8a-7950-49e3-8739-36bcfc1db7fa",
+                                price: 299,
+                                variant: {
+                                    id: "7868c357-4726-432a-ad5d-49619e6a508b"
+                                },
+                                quantity: 1
+                            }
+                        ],
+                        billingAddress: {
+                            addressLine1: `${cityName} Test Fatura Adresi`,
+                            addressLine2: "Apt: Test Apt Daire: 5",
+                            city: {
+                                id: cityId,
+                                name: cityName
+                            },
+                            country: {
+                                name: "Türkiye"
+                            },
+                            district: {
+                                id: districtId,
+                                name: districtName
+                            },
+                            firstName: "Test",
+                            lastName: "Kullanıcı",
+                            zipCode: cityId + "000",
+                            isDefault: false
+                        },
+                        shippingAddress: {
+                            addressLine1: `${cityName} Test Teslimat Adresi`,
+                            addressLine2: "Plaza B Blok Kat: 3",
+                            city: {
+                                id: cityId,
+                                name: cityName
+                            },
+                            country: {
+                                name: "Türkiye"
+                            },
+                            district: {
+                                id: districtId,
+                                name: districtName
+                            },
+                            firstName: "Test",
+                            lastName: "Kullanıcı",
+                            phone: "05551234567",
+                            zipCode: cityId + "000",
+                            isDefault: false
+                        },
+                        note: `${cityName}/${districtName} ID'li test siparişi`,
+                        deleted: false,
+                        customer: {
+                            lastName: "Kullanıcı",
+                            firstName: "Test",
+                            email: `test.${cityName.toLowerCase()}@calformat.com`
+                        }
+                    },
+                    transactions: [
+                        {
+                            amount: 329 // 299 + 30 kargo
+                        }
+                    ]
+                }
+            };
+        }
+
+        async function makeAPIRequest(payload, testName) {
+            const startTime = Date.now();
+            
+            try {
+                console.log(`🚀 ${testName} başlatıldı...`);
+                
+                const response = await fetch('/ikas_create_order.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'omit',
+                    body: JSON.stringify(payload),
+                    signal: AbortSignal.timeout(30000)
+                });
+
+                const responseTime = Date.now() - startTime;
+                const responseText = await response.text();
+                
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (parseError) {
+                    result = {
+                        error: 'JSON Parse Error',
+                        raw_response: responseText.substring(0, 500),
+                        parse_error: parseError.message
+                    };
+                }
+
+                return {
+                    success: response.ok,
+                    status: response.status,
+                    statusText: response.statusText,
+                    responseTime: responseTime,
+                    data: result,
+                    headers: Object.fromEntries(response.headers.entries())
+                };
+
+            } catch (error) {
+                const responseTime = Date.now() - startTime;
+                return {
+                    success: false,
+                    error: error.message,
+                    responseTime: responseTime
+                };
+            }
+        }
+
+        async function testIstanbulBeykoz() {
+            const resultDiv = document.getElementById('result-istanbul');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.textContent = '⏳ İstanbul/Beykoz ID\'li sipariş test ediliyor...';
+
+            const payload = createOrderPayloadWithIds("34", "İstanbul", "34-020", "Beykoz");
+            const result = await makeAPIRequest(payload, 'İstanbul/Beykoz ID Test');
+            
+            resultDiv.className = result.success ? 'result success' : 'result error';
+            resultDiv.textContent = `📊 İstanbul/Beykoz ID Test Sonucu (${result.responseTime}ms):
+            
+Status: ${result.status} ${result.statusText}
+Success: ${result.success}
+
+🏙️ Test Edilen ID'ler:
+- İl ID: "34" (İstanbul)
+- İlçe ID: "34-020" (Beykoz)
+
+${result.data?.success ? '✅ Sipariş başarıyla oluşturuldu!' : '❌ Hata oluştu'}
+${result.data?.fallback_mode ? '⚠️ Fallback mode devrede' : ''}
+${result.data?.validation_failed ? '❌ Validation hataları: ' + JSON.stringify(result.data.errors) : ''}
+
+Response Data:
+${JSON.stringify(result.data, null, 2)}`;
+        }
+
+        async function testIstanbulSisli() {
+            const resultDiv = document.getElementById('result-sisli');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.textContent = '⏳ İstanbul/Şişli ID\'li sipariş test ediliyor...';
+
+            const payload = createOrderPayloadWithIds("34", "İstanbul", "34-025", "Şişli");
+            const result = await makeAPIRequest(payload, 'İstanbul/Şişli ID Test');
+            
+            resultDiv.className = result.success ? 'result success' : 'result error';
+            resultDiv.textContent = `📊 İstanbul/Şişli ID Test Sonucu (${result.responseTime}ms):
+            
+Status: ${result.status} ${result.statusText}
+Success: ${result.success}
+
+🏙️ Test Edilen ID'ler:
+- İl ID: "34" (İstanbul)
+- İlçe ID: "34-025" (Şişli)
+
+Response Data:
+${JSON.stringify(result.data, null, 2)}`;
+        }
+
+        async function testAnkaraCankaya() {
+            const resultDiv = document.getElementById('result-ankara');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.textContent = '⏳ Ankara/Çankaya ID\'li sipariş test ediliyor...';
+
+            const payload = createOrderPayloadWithIds("06", "Ankara", "06-008", "Çankaya");
+            const result = await makeAPIRequest(payload, 'Ankara/Çankaya ID Test');
+            
+            resultDiv.className = result.success ? 'result success' : 'result error';
+            resultDiv.textContent = `📊 Ankara/Çankaya ID Test Sonucu (${result.responseTime}ms):
+            
+Status: ${result.status} ${result.statusText}
+Success: ${result.success}
+
+🏙️ Test Edilen ID'ler:
+- İl ID: "06" (Ankara)
+- İlçe ID: "06-008" (Çankaya)
+
+Response Data:
+${JSON.stringify(result.data, null, 2)}`;
+        }
+
+        async function testMissingIds() {
+            const resultDiv = document.getElementById('result-missing');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+            resultDiv.textContent = '⏳ Eksik ID validation testi yapılıyor...';
+
+            // ID'leri eksik bırak
+            const invalidPayload = {
+                input: {
+                    order: {
+                        orderLineItems: [
+                            {
+                                id: "8c64cc8a-7950-49e3-8739-36bcfc1db7fa",
+                                price: 299,
+                                variant: { id: "7868c357-4726-432a-ad5d-49619e6a508b" },
+                                quantity: 1
+                            }
+                        ],
+                        billingAddress: {
+                            addressLine1: "Test Adres",
+                            city: {
+                                // ID eksik!
+                                name: "İstanbul"
+                            },
+                            country: { name: "Türkiye" },
+                            district: {
+                                // ID eksik!
+                                name: "Test İlçe"
+                            },
+                            firstName: "Test",
+                            lastName: "User",
+                            zipCode: "34000",
+                            isDefault: false
+                        },
+                        shippingAddress: {
+                            addressLine1: "Test Adres",
+                            city: {
+                                // ID eksik!
+                                name: "İstanbul"
+                            },
+                            country: { name: "Türkiye" },
+                            district: {
+                                // ID eksik!
+                                name: "Test İlçe"
+                            },
+                            firstName: "Test",
+                            lastName: "User",
+                            phone: "05551234567",
+                            zipCode: "34000",
+                            isDefault: false
+                        },
+                        note: "Eksik ID validation test",
+                        deleted: false,
+                        customer: {
+                            firstName: "Test",
+                            lastName: "User",
+                            email: "test@example.com"
+                        }
+                    },
+                    transactions: [{ amount: 329 }]
+                }
+            };
+
+            const result = await makeAPIRequest(invalidPayload, 'Eksik ID Validation Test');
+            
+            resultDiv.className = 'result';
+            resultDiv.textContent = `📊 Eksik ID Validation Test Sonucu (${result.responseTime}ms):
+            
+Status: ${result.status} ${result.statusText}
+Success: ${result.success}
+
+❌ Eksik ID'ler:
+- city.id eksik
+- district.id eksik
+
+${result.data?.validation_failed ? '✅ Validation başarıyla hataları yakaladı!' : '❌ Validation çalışmadı'}
+
+Validation Errors:
+${JSON.stringify(result.data?.errors || [], null, 2)}
+
+Response Data:
+${JSON.stringify(result.data, null, 2)}`;
+        }
+
+        function showFullPayloadWithIds() {
+            const payloadDiv = document.getElementById('payload-full');
+            payloadDiv.style.display = 'block';
+
+            const fullPayload = createOrderPayloadWithIds("34", "İstanbul", "34-020", "Beykoz");
+
+            payloadDiv.textContent = `📦 Tam ID'li İkas Sipariş Payload:
+
+${JSON.stringify(fullPayload, null, 2)}
+
+🆔 ID Alanları:
+✅ city.id: "34" (İstanbul il kodu)
+✅ city.name: "İstanbul" (İl adı)
+✅ district.id: "34-020" (Beykoz ilçe kodu)
+✅ district.name: "Beykoz" (İlçe adı)
+
+📋 GraphQL Mutation (ID'li):
+mutation CreateOrderWithTransactions($input: CreateOrderWithTransactionsInput!) {
+  createOrderWithTransactions(input: $input) {
+    id orderNumber totalAmount status
+    customer { id email firstName lastName }
+    orderLineItems {
+      id quantity price
+      variant { id sku product { id name } }
+    }
+    billingAddress {
+      firstName lastName addressLine1 addressLine2
+      city { id name } country { name } district { id name }
+      zipCode isDefault
+    }
+    shippingAddress {
+      firstName lastName addressLine1 addressLine2
+      city { id name } country { name } district { id name }
+      phone zipCode isDefault
+    }
+    transactions { id amount status transactionType }
+    note deleted createdAt updatedAt
+  }
+}
+
+✅ Validation Kontrolü:
+- city.id boş olamaz
+- city.name boş olamaz
+- district.id boş olamaz
+- district.name boş olamaz`;
+        }
+
+        // Sayfa yüklendiğinde
+        console.log('🆔 İkas Sipariş API - İl/İlçe ID\'li test sayfası yüklendi');
+        console.log('📍 City ve District ID\'leri artık sipariş payload\'ında mevcut');
+    </script>
+</body>
+</html>

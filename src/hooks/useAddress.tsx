@@ -22,13 +22,31 @@ export const useAddress = () => {
     towns: null as string | null
   });
 
-  // Helper: Seçili şehir/ilçe/mahalle isimlerini getir
+  // Helper: Seçili şehir/ilçe/mahalle isimlerini ve id'lerini getir
   const getSelectedNames = () => {
     const cityName = cities.find(c => c.id === selectedCity)?.name || addressService.getCityNameById(selectedCity);
     const districtName = districts.find(d => d.id === selectedDistrict)?.name || addressService.getDistrictNameById(selectedDistrict);
     const townName = towns.find(t => t.id === selectedTown)?.name || '';
     
     return { cityName, districtName, townName };
+  };
+
+  // Helper: Seçili şehir/ilçe/mahalle bilgilerini id ve name ile getir
+  const getSelectedAddressInfo = () => {
+    return {
+      city: {
+        id: selectedCity,
+        name: cities.find(c => c.id === selectedCity)?.name || addressService.getCityNameById(selectedCity)
+      },
+      district: {
+        id: selectedDistrict,
+        name: districts.find(d => d.id === selectedDistrict)?.name || addressService.getDistrictNameById(selectedDistrict)
+      },
+      town: {
+        id: selectedTown,
+        name: towns.find(t => t.id === selectedTown)?.name || ''
+      }
+    };
   };
 
   // İlleri yükle
@@ -135,6 +153,7 @@ export const useAddress = () => {
     loading,
     errors,
     getSelectedNames,
+    getSelectedAddressInfo,
     // Retry functions
     retryCities: loadCities,
     retryDistricts: () => selectedCity && loadDistricts(selectedCity),
