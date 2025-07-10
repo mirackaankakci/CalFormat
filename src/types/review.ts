@@ -1,5 +1,5 @@
 export interface Review {
-  id: number;
+  id: string; // Firebase document ID
   userName: string;
   rating: number; // 1-5 arası yıldız değeri
   title: string;
@@ -8,4 +8,6 @@ export interface Review {
   avatarUrl?: string;
   verified: boolean;
   productId: number;
+  createdAt: Date;
+  updatedAt: Date;
 }

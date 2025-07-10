@@ -225,7 +225,7 @@ const CTASection: React.FC = () => {
           </div>
           
           <h3 className="text-6xl md:text-5xl font-bold text-white mb-8 md:mb-6 leading-tight">
-            İkas Mağazamızdan
+            Mağazamızdan
             <br />
             <span className="bg-gradient-to-r from-yellow-200 to-orange-200 bg-clip-text text-transparent">
               Premium Ürünler
@@ -236,17 +236,6 @@ const CTASection: React.FC = () => {
             CalFormat ile meyve ve sebzelerinizi güvenle tüketin
           </p>
           
-          <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-4 mb-8 md:mb-4">
-            <div className="bg-green-500/20 text-white px-6 py-3 md:px-4 md:py-2 rounded-lg inline-flex items-center gap-2 text-lg md:text-base">
-              <Award className="w-6 h-6 md:w-5 md:h-5" />
-              İkas API'den {products.length} ürün başarıyla yüklendi
-            </div>
-            
-            <div className="bg-blue-500/20 text-white px-6 py-3 md:px-4 md:py-2 rounded-lg inline-flex items-center gap-2 text-lg md:text-base">
-              <Truck className="w-6 h-6 md:w-5 md:h-5" />
-              Ücretsiz Kargo
-            </div>
-          </div>
         </div>        {/* Ürün Kartları */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 md:gap-8 mb-16 md:mb-12">
           {products.map((product) => (
@@ -274,11 +263,6 @@ const CTASection: React.FC = () => {
                     e.currentTarget.src = '/calformat.webp';
                   }}
                 />
-                {product.stock !== undefined && product.stock <= 0 && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <span className="text-white font-bold text-lg md:text-base">Stokta Yok</span>
-                  </div>
-                )}
                 
                 {/* Kalite rozetleri */}
                 <div className="absolute top-3 left-3 flex flex-col gap-2">
@@ -345,67 +329,18 @@ const CTASection: React.FC = () => {
                   </p>
                 )}
 
-                {/* Stok Durumu */}
-                {product.stock !== undefined && (
-                  <p className="text-base md:text-sm text-gray-600 flex items-center gap-2">
-                    <Truck className="w-4 h-4" />
-                    Stok: <span className={`font-medium ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {product.stock > 0 ? `${product.stock} adet` : 'Tükendi'}
-                    </span>
-                  </p>
-                )}
-
                 {/* Sepete Ekle Butonu */}
                 <button 
                   onClick={() => handleAddToCart(product)}
-                  className={`w-full px-8 py-5 md:px-6 md:py-3 rounded-xl font-bold text-xl md:text-lg shadow-lg flex items-center justify-center gap-3 md:gap-2 transition-all duration-300 transform ${
-                    product.stock !== undefined && product.stock <= 0
-                      ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] text-white hover:from-[#d62d27] hover:to-[#ee7f1a] hover:scale-105 hover:shadow-xl'
-                  }`}
-                  disabled={product.stock !== undefined && product.stock <= 0}
+                  className="w-full px-8 py-5 md:px-6 md:py-3 rounded-xl font-bold text-xl md:text-lg shadow-lg flex items-center justify-center gap-3 md:gap-2 transition-all duration-300 transform bg-gradient-to-r from-[#ee7f1a] to-[#d62d27] text-white hover:from-[#d62d27] hover:to-[#ee7f1a] hover:scale-105 hover:shadow-xl"
                 >
                   <ShoppingCart className="w-6 h-6 md:w-5 md:h-5" />
-                  {product.stock !== undefined && product.stock <= 0 ? 'Stokta Yok' : 'Sepete Ekle'}
+                  Sepete Ekle
                 </button>
               </div>
             </div>
           ))}
         </div>        {/* CTA */}
-        <div className="text-center">
-          <div className="flex flex-col md:flex-row flex-wrap items-center justify-center gap-8 md:gap-6 text-orange-100 mb-12 md:mb-8">
-            <div className="flex items-center gap-3 md:gap-2 hover:text-white transition-colors duration-300 bg-white/10 backdrop-blur-sm rounded-full px-6 py-4 md:px-4 md:py-2">
-              <Leaf className="w-6 h-6 md:w-5 md:h-5" />
-              <span className="text-lg md:text-base font-medium">İkas Entegrasyonu</span>
-            </div>
-            <div className="flex items-center gap-3 md:gap-2 hover:text-white transition-colors duration-300 bg-white/10 backdrop-blur-sm rounded-full px-6 py-4 md:px-4 md:py-2">
-              <Zap className="w-6 h-6 md:w-5 md:h-5" />
-              <span className="text-lg md:text-base font-medium">Gerçek Zamanlı Stok</span>
-            </div>
-            <div className="flex items-center gap-3 md:gap-2 hover:text-white transition-colors duration-300 bg-white/10 backdrop-blur-sm rounded-full px-6 py-4 md:px-4 md:py-2">
-              <Award className="w-6 h-6 md:w-5 md:h-5" />
-              <span className="text-lg md:text-base font-medium">Güncel Fiyatlar</span>
-            </div>
-          </div>
-          
-          <div className="bg-white/15 backdrop-blur-sm rounded-3xl p-8 md:p-6 max-w-2xl mx-auto mb-8 md:mb-6">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <Shield className="w-8 h-8 md:w-6 md:h-6 text-white" />
-              <h4 className="text-2xl md:text-xl font-bold text-white">Güvenli Alışveriş</h4>
-            </div>
-            <p className="text-orange-100 text-lg md:text-base leading-relaxed">
-              İkas altyapısı ile %100 güvenli ödeme ve hızlı teslimat garantisi
-            </p>
-          </div>
-          
-          <button 
-            onClick={() => window.open('https://calformat.myikas.com', '_blank')}
-            className="bg-white text-[#ee7f1a] px-12 py-6 md:px-8 md:py-4 rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 font-bold text-2xl md:text-lg shadow-lg flex items-center justify-center gap-3 md:gap-2 mx-auto"
-          >
-            <ShoppingCart className="w-8 h-8 md:w-5 md:h-5" />
-            İkas Mağazasını Ziyaret Et
-          </button>
-        </div>
       </div>
     </section>
   );
