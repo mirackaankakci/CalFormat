@@ -87,23 +87,61 @@ const Checkout: React.FC = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const status = urlParams.get('status');
       const invoiceId = urlParams.get('invoice_id');
+      const orderNo = urlParams.get('order_no');
       
       // Sipay parametreleri (3D dönüş)
       const sipayStatus = urlParams.get('sipay_status');
-      const orderNo = urlParams.get('order_no');
+      
+      console.log('🔍 URL Parametreleri:', {
+        status,
+        invoiceId,
+        orderNo,
+        sipayStatus,
+        allParams: Object.fromEntries(urlParams.entries())
+      });
 
-      // 3D ödeme başarılı dönüş
-      if ((status === 'success' || sipayStatus === '1') && invoiceId) {
-        console.log('✅ 3D ödeme başarılı!', { status, sipayStatus, invoiceId });
+      // 3D ödeme başarılı dönüş (farklı kombinasyonları destekle)
+      if (
+        (status === 'success' && invoiceId) ||
+        (sipayStatus === '1' && invoiceId) ||
+        (status === 'success' && sipayStatus === '1' && invoiceId)
+      ) {
+        console.log('✅ 3D ödeme başarılı tespit edildi!', { status, sipayStatus, invoiceId, orderNo });
         
         // localStorage'dan form verilerini oku
         const savedData = localStorage.getItem('checkout_form_data');
         if (savedData) {
+          console.log('💾 3D ödeme sonrası localStorage\'dan veri okunuyor...');
+          
           try {
-            const { formData: savedFormData, selectedNames: savedSelectedNames, isCompany: savedIsCompany, selectedCity: savedSelectedCity, selectedDistrict: savedSelectedDistrict, selectedTown: savedSelectedTown } = JSON.parse(savedData);
+            const parsedData = JSON.parse(savedData);
+            console.log('📋 localStorage\'dan okunan veri:', parsedData);
+            
+            const { 
+              formData: savedFormData, 
+              selectedNames: savedSelectedNames, 
+              isCompany: savedIsCompany, 
+              selectedCity: savedSelectedCity, 
+              selectedDistrict: savedSelectedDistrict, 
+              selectedTown: savedSelectedTown,
+              cartItems: savedCartItems,
+              subtotal: savedSubtotal,
+              shipping: savedShipping,
+              total: savedTotal,
+              invoiceId: savedInvoiceId,
+              timestamp: savedTimestamp
+            } = parsedData;
             
             // Sipariş oluşturma API'sini çağır
             console.log('📦 3D ödeme sonrası sipariş oluşturuluyor...');
+            console.log('💾 localStorage veriler:', { 
+              savedCartItems, 
+              savedSubtotal, 
+              savedShipping, 
+              savedTotal,
+              savedInvoiceId,
+              savedTimestamp
+            });
             
             // ✅ GELİŞTİRİLMİŞ ADRES VALİDASYONU
             if (!savedSelectedCity || !savedSelectedDistrict) {
@@ -178,18 +216,20 @@ const Checkout: React.FC = () => {
               isDifferentBillingAddress: false
             };
             
+            console.log('📋 Sipariş payload:', orderPayload);
+            
             const orderResult = await createOrder(orderPayload);
             console.log('✅ 3D ödeme sonrası sipariş başarıyla oluşturuldu:', orderResult);
             
             setOrderData({
               success: true,
-              orderId: orderResult.orderId || orderNo || invoiceId,
-              invoiceId: invoiceId,
+              orderId: orderResult.orderId || orderNo || invoiceId || savedInvoiceId,
+              invoiceId: invoiceId || savedInvoiceId,
               orderSummary: {
-                items: items,
-                subtotal: subtotal,
-                shipping: shipping,
-                total: total
+                items: savedCartItems || items,
+                subtotal: savedSubtotal || subtotal,
+                shipping: savedShipping || shipping,
+                total: savedTotal || total
               }
             });
             
@@ -199,15 +239,24 @@ const Checkout: React.FC = () => {
           } catch (orderError) {
             console.error('❌ 3D ödeme sonrası sipariş oluşturma hatası:', orderError);
             
+            // Yine localStorage'dan değerleri oku çünkü catch bloğunda da bunlara ihtiyacımız var
+            const { 
+              cartItems: savedCartItems,
+              subtotal: savedSubtotal,
+              shipping: savedShipping,
+              total: savedTotal,
+              invoiceId: savedInvoiceId
+            } = parsedData;
+            
             setOrderData({
               success: true,
-              orderId: orderNo || invoiceId,
-              invoiceId: invoiceId,
+              orderId: orderNo || invoiceId || savedInvoiceId,
+              invoiceId: invoiceId || savedInvoiceId,
               orderSummary: {
-                items: items,
-                subtotal: subtotal,
-                shipping: shipping,
-                total: total
+                items: savedCartItems || items,
+                subtotal: savedSubtotal || subtotal,
+                shipping: savedShipping || shipping,
+                total: savedTotal || total
               },
               orderError: 'Ödeme başarılı ancak sipariş kaydedilemedi. Lütfen müşteri hizmetleri ile iletişime geçin.'
             });
@@ -217,6 +266,8 @@ const Checkout: React.FC = () => {
           }
         } else {
           // Fallback: Form verisi yoksa basit sipariş kaydı
+          console.warn('⚠️ 3D ödeme sonrası localStorage\'da form verisi bulunamadı!');
+          
           setOrderData({
             success: true,
             orderId: orderNo || invoiceId,
@@ -226,7 +277,8 @@ const Checkout: React.FC = () => {
               subtotal: subtotal,
               shipping: shipping,
               total: total
-            }
+            },
+            orderError: 'Ödeme başarılı ancak sipariş bilgileri eksik. Lütfen müşteri hizmetleri ile iletişime geçin.'
           });
         }
         
@@ -236,9 +288,14 @@ const Checkout: React.FC = () => {
         // URL'yi temizle
         window.history.replaceState({}, '', '/checkout');
       } 
-      // 3D ödeme başarısız dönüş
-      else if ((status === 'failed' || status === 'cancel' || sipayStatus === '0') && invoiceId) {
-        console.log('❌ 3D ödeme başarısız!', { status, sipayStatus, invoiceId });
+      // 3D ödeme başarısız dönüş (farklı kombinasyonları destekle)
+      else if (
+        (status === 'failed' && invoiceId) ||
+        (status === 'cancel' && invoiceId) ||
+        (sipayStatus === '0' && invoiceId) ||
+        (status === 'failed' && sipayStatus === '0' && invoiceId)
+      ) {
+        console.log('❌ 3D ödeme başarısız tespit edildi!', { status, sipayStatus, invoiceId, orderNo });
         
         setOrderError('3D güvenli ödeme işlemi başarısız oldu veya iptal edildi. Lütfen tekrar deneyin.');
         setActiveStep('odeme');
@@ -249,10 +306,18 @@ const Checkout: React.FC = () => {
         // URL'yi temizle
         window.history.replaceState({}, '', '/checkout');
       }
+      
+      // Hiçbir 3D ödeme sonucu yoksa normal akışa devam et
+      else if (status || sipayStatus) {
+        console.log('⚠️ Bilinmeyen 3D ödeme durumu:', { status, sipayStatus, invoiceId, orderNo });
+        
+        // URL'yi temizle
+        window.history.replaceState({}, '', '/checkout');
+      }
     };
 
     checkPaymentResult();
-  }, [items, subtotal, shipping, total, clearCart]);
+  }, [items, subtotal, shipping, total, clearCart, createOrder, getSelectedAddressInfo]);
 
   const validateStep = (step: 'bilgiler' | 'odeme' | 'onay') => {
     if (step === 'bilgiler') {
@@ -416,14 +481,23 @@ const Checkout: React.FC = () => {
       };
 
       // 3D ödeme öncesi form verilerini localStorage'a kaydet
-      localStorage.setItem('checkout_form_data', JSON.stringify({
+      const checkoutData = {
         formData,
         selectedNames,
         isCompany,
         selectedCity,
         selectedDistrict,
-        selectedTown
-      }));
+        selectedTown,
+        cartItems: items, // Sepet ürünlerini de kaydet
+        subtotal: subtotal,
+        shipping: shipping,
+        total: total,
+        invoiceId: invoiceId, // Invoice ID'yi de kaydet
+        timestamp: Date.now() // Timestamp ekle
+      };
+      
+      localStorage.setItem('checkout_form_data', JSON.stringify(checkoutData));
+      console.log('💾 3D ödeme öncesi localStorage\'a kaydedildi:', checkoutData);
 
       const result = await sipayService.processPayment(paymentData);
 
@@ -449,16 +523,21 @@ const Checkout: React.FC = () => {
             setOrderError(null);
             setIsProcessingPayment(false);
             
+            console.log('🔄 3D ödeme penceresi açıldı. Kullanıcı 3D güvenlik doğrulamasını tamamlamalı.');
+            
             // 3D ödeme sonucunu bekle
             const checkInterval = setInterval(() => {
               if (newWindow.closed) {
                 clearInterval(checkInterval);
+                console.log('🔄 3D ödeme penceresi kapatıldı. Sayfa yenileniyor...');
                 // Sayfa yenilenmesini bekle
                 window.location.reload();
               }
             }, 1000);
             
             return;
+          } else {
+            throw new Error('3D ödeme penceresi açılamadı. Lütfen popup engelleyicisini devre dışı bırakın.');
           }
         }
         

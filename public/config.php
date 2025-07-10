@@ -94,8 +94,8 @@ return [
         'debug_mode' => getenv('DEBUG_MODE') === 'true'
     ],
     
-    // Frontend URL
-    'frontend_url' => getenv('FRONTEND_URL') ?: 'http://localhost:5173',
+    // Frontend URL - Geçici olarak IP adresi kullan
+    'frontend_url' => getenv('FRONTEND_URL') ?: 'http://89.252.132.90',
     
     // Güvenlik Ayarları
     'security' => [
