@@ -28,7 +28,6 @@ const Checkout: React.FC = () => {
   const [orderData, setOrderData] = useState<any>(null);
   const [isCompany, setIsCompany] = useState(false);
   const [installmentOptions, setInstallmentOptions] = useState<any[]>([]);
-  const [paymentType, setPaymentType] = useState<'2D' | '3D'>('3D'); // Varsayılan olarak 3D güvenli
   const [shippingCost, setShippingCost] = useState(0.0);
   const [shippingThreshold, setShippingThreshold] = useState(0.0);
   
@@ -391,7 +390,7 @@ const Checkout: React.FC = () => {
       }
 
       const paymentData: SiPayPaymentData = {
-        payment_type: paymentType,
+        payment_type: '3D',
         cc_holder_name: cardData.cardHolder,
         cc_no: cardData.cardNumber.replace(/\s/g, ''),
         expiry_month: cardData.expiryMonth.padStart(2, '0'),
@@ -1003,190 +1002,119 @@ const Checkout: React.FC = () => {
 
               {activeStep === 'odeme' && (
                 <div className="space-y-6">
-                  {/* Ödeme Tipi Seçimi */}
-                  <div className="bg-white rounded-lg shadow-sm border p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Lock className="w-5 h-5 text-orange-500" />
-                      <h3 className="text-lg font-semibold text-gray-900">Ödeme Güvenlik Seviyesi</h3>
+                  {/* Ödeme Güvenlik Bilgisi */}
+
+                  <div className="bg-white rounded-xl shadow-sm border p-6">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                        <CreditCard className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900">Kredi Kartı Bilgileri</h3>
+                        <p className="text-sm text-gray-600">Güvenli ödeme için kart bilgilerinizi girin</p>
+                      </div>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* 3D Secure Ödeme (Önerilen) */}
-                      <div 
-                        className={`border-2 rounded-lg p-5 cursor-pointer transition-all relative ${
-                          paymentType === '3D' 
-                            ? 'border-green-500 bg-green-50' 
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        onClick={() => setPaymentType('3D')}
-                      >
-                        {paymentType === '3D' && (
-                          <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                            ✓ Seçildi
-                          </div>
-                        )}
-                        <div className="absolute top-3 right-3">
-                          <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
-                            ÖNERİLEN
-                          </span>
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                          <Lock className="w-5 h-5 text-white" />
                         </div>
-                        <div className="flex items-start gap-3 mt-3">
-                          <input
-                            type="radio"
-                            name="paymentType"
-                            value="3D"
-                            checked={paymentType === '3D'}
-                            onChange={() => setPaymentType('3D')}
-                            className="text-green-500 focus:ring-green-500 mt-1"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-2xl">🛡️</span>
-                              <span className="font-semibold text-gray-900">3D Secure Ödeme</span>
-                            </div>
-                            <div className="space-y-1 text-sm text-gray-600">
-                              <div className="flex items-center gap-2">
-                                <Check className="w-4 h-4 text-green-500" />
-                                <span>SMS ile güvenlik doğrulaması</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Check className="w-4 h-4 text-green-500" />
-                                <span>Banka güvencesi altında</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Check className="w-4 h-4 text-green-500" />
-                                <span>Fraud koruması</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 2D Hızlı Ödeme */}
-                      <div 
-                        className={`border-2 rounded-lg p-5 cursor-pointer transition-all ${
-                          paymentType === '2D' 
-                            ? 'border-orange-500 bg-orange-50' 
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        onClick={() => setPaymentType('2D')}
-                      >
-                        {paymentType === '2D' && (
-                          <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
-                            ✓ Seçildi
-                          </div>
-                        )}
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="radio"
-                            name="paymentType"
-                            value="2D"
-                            checked={paymentType === '2D'}
-                            onChange={() => setPaymentType('2D')}
-                            className="text-orange-500 focus:ring-orange-500 mt-1"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-2xl">⚡</span>
-                              <span className="font-semibold text-gray-900">Hızlı Ödeme</span>
-                            </div>
-                            <div className="space-y-1 text-sm text-gray-600">
-                              <div className="flex items-center gap-2">
-                                <Check className="w-4 h-4 text-orange-500" />
-                                <span>Anında işlem tamamlanır</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Check className="w-4 h-4 text-orange-500" />
-                                <span>SMS bekleme süresi yok</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <AlertCircle className="w-4 h-4 text-yellow-500" />
-                                <span>Standart güvenlik seviyesi</span>
-                              </div>
-                            </div>
-                          </div>
+                        <div>
+                          <p className="text-blue-900 text-sm font-medium">256-bit SSL Şifrelemesi</p>
+                          <p className="text-blue-700 text-xs">Tüm ödeme bilgileriniz bankacılık seviyesinde korunmaktadır</p>
                         </div>
                       </div>
                     </div>
 
-                    {/* Bilgilendirme Mesajları */}
-                    {paymentType === '3D' && (
-                      <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                    {/* Sipay Bilgilendirme */}
+                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-6 mb-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
+                            <CreditCard className="w-5 h-5 text-white" />
+                          </div>
                           <div>
-                            <p className="text-sm font-medium text-green-900">3D Secure ile güvenli ödeme</p>
-                            <p className="text-xs text-green-700 mt-1">
-                              Ödeme işlemi sırasında bankanızdan gelecek SMS ile doğrulama yapacaksınız. 
-                              Bu ek güvenlik katmanı kartınızı yetkisiz kullanımlara karşı korur.
-                            </p>
+                            <p className="text-purple-900 text-sm font-bold">Sipay Güvenli Ödeme Sistemi</p>
+                            <p className="text-purple-700 text-xs">Türkiye'nin güvenilir ödeme altyapısı</p>
                           </div>
                         </div>
+                        <img 
+                          src="/sipay_logo.svg" 
+                          alt="Sipay Logo" 
+                          className="h-8 opacity-80"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
                       </div>
-                    )}
-
-                    {paymentType === '2D' && (
-                      <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <AlertCircle className="w-5 h-5 text-orange-500 mt-0.5" />
-                          <div>
-                            <p className="text-sm font-medium text-orange-900">Hızlı ödeme seçildi</p>
-                            <p className="text-xs text-orange-700 mt-1">
-                              Ödeme işlemi anında tamamlanacak, SMS doğrulaması olmayacak. 
-                              Güvenlik için kartınızı sadece güvendiğiniz sitelerde kullanın.
-                            </p>
-                          </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          <span className="text-xs text-purple-700 font-medium">PCI DSS Sertifikalı</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          <span className="text-xs text-purple-700 font-medium">Tüm banka kartları desteklenir</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          <span className="text-xs text-purple-700 font-medium">7/24 Müşteri Desteği</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          <span className="text-xs text-purple-700 font-medium">Anında işlem onayı</span>
                         </div>
                       </div>
-                    )}
-                  </div>
-
-                  <div className="bg-white rounded-lg shadow-sm border p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <CreditCard className="h-5 w-5" />
-                      Kredi Kartı Bilgileri
-                    </h3>
-                    
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                      <div className="flex items-center gap-2">
-                        <Lock className="h-5 w-5 text-green-600" />
-                        <p className="text-green-800 text-sm">
-                          Tüm ödeme bilgileriniz 256-bit SSL şifrelemesi ile korunmaktadır.
+                      
+                      <div className="mt-4 p-3 bg-white/60 rounded-lg">
+                        <p className="text-xs text-purple-800 leading-relaxed">
+                          <span className="font-semibold">Sipay</span> ile güvenli ödeme yapıyorsunuz. 
+                          Kart bilgileriniz şifrelenerek saklanır ve hiçbir zaman üçüncü kişilerle paylaşılmaz.
                         </p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-6">
+                    <div className="space-y-6">
                       {/* Kart Numarası */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Kart Numarası *</label>
-                        <input
-                          type="text"
-                          name="cardNumber"
-                          value={cardData.cardNumber}
-                          onChange={handleCardInputChange}
-                          placeholder="1234 5678 9012 3456"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                          maxLength={19}
-                          required
-                        />
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Kart Numarası *</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            name="cardNumber"
+                            value={cardData.cardNumber}
+                            onChange={handleCardInputChange}
+                            placeholder="1234 5678 9012 3456"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg font-mono tracking-wider"
+                            maxLength={19}
+                            required
+                          />
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <CreditCard className="w-5 h-5 text-gray-400" />
+                          </div>
+                        </div>
                         {cardData.cardNumber && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            Kart Türü: {sipayService.getCardType(cardData.cardNumber)}
-                          </p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <p className="text-sm text-blue-600 font-medium">
+                              Kart Türü: {sipayService.getCardType(cardData.cardNumber)}
+                            </p>
+                          </div>
                         )}
                       </div>
 
                       {/* Kart Sahibi */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Kart Sahibinin Adı *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Kart Sahibinin Adı *</label>
                         <input
                           type="text"
                           name="cardHolder"
                           value={cardData.cardHolder}
                           onChange={handleCardInputChange}
                           placeholder="JOHN DOE"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 uppercase"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase text-lg font-medium tracking-wide"
                           required
                         />
                       </div>
@@ -1194,47 +1122,52 @@ const Checkout: React.FC = () => {
                       {/* Son Kullanma Tarihi ve CVV */}
                       <div className="grid grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Ay *</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Ay *</label>
                           <input
                             type="text"
                             name="expiryMonth"
                             value={cardData.expiryMonth}
                             onChange={handleCardInputChange}
                             placeholder="MM"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-lg font-mono"
                             maxLength={2}
                             required
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Yıl *</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Yıl *</label>
                           <input
                             type="text"
                             name="expiryYear"
                             value={cardData.expiryYear}
                             onChange={handleCardInputChange}
                             placeholder="YYYY"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-lg font-mono"
                             maxLength={4}
                             required
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">CVV *</label>
-                          <input
-                            type="text"
-                            name="cvv"
-                            value={cardData.cvv}
-                            onChange={handleCardInputChange}
-                            placeholder="123"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                            maxLength={4}
-                            required
-                          />
+                          <label className="block text-sm font-medium text-gray-700 mb-2">CVV *</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              name="cvv"
+                              value={cardData.cvv}
+                              onChange={handleCardInputChange}
+                              placeholder="123"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center text-lg font-mono"
+                              maxLength={4}
+                              required
+                            />
+                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                              <Lock className="w-4 h-4 text-gray-400" />
+                            </div>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Taksit Seçenekleri */}
+                      {/* Taksit Seçenekleri 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Taksit Seçenekleri</label>
                         <select
@@ -1250,6 +1183,7 @@ const Checkout: React.FC = () => {
                           ))}
                         </select>
                       </div>
+                      */}
                     </div>
                   </div>
 
@@ -1264,19 +1198,51 @@ const Checkout: React.FC = () => {
                     <button
                       type="submit"
                       disabled={isProcessingPayment}
-                      className="flex-1 bg-orange-500 text-white py-3 px-6 rounded-lg font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 px-8 rounded-xl font-bold text-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:scale-105"
                     >
                       {isProcessingPayment ? (
                         <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          {paymentType === '3D' ? '3D Güvenli Ödeme İşleniyor...' : 'Hızlı Ödeme İşleniyor...'}
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          3D Güvenli Ödeme İşleniyor...
                         </>
                       ) : (
                         <>
-                          {paymentType === '3D' ? '🛡️' : '⚡'} {total.toFixed(2)} ₺ {paymentType === '3D' ? 'Güvenli Öde' : 'Hızlı Öde'}
+                          <Lock className="h-5 w-5" />
+                          {total.toFixed(2)} ₺ - 3D Güvenli Öde
                         </>
                       )}
                     </button>
+                  </div>
+
+                  {/* Sipay Güven Rozeti */}
+                  <div className="bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200 rounded-xl p-4">
+                    <div className="flex items-center justify-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src="/sipay_logo.svg" 
+                          alt="Sipay" 
+                          className="h-6 opacity-70"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                        <span className="text-sm text-gray-600 font-medium">ile güvenli ödeme</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <div className="flex items-center gap-1">
+                          <Lock className="w-3 h-3" />
+                          <span>SSL</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <CreditCard className="w-3 h-3" />
+                          <span>PCI DSS</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          <span>3D Secure</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
