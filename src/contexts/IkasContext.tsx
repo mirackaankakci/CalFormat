@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { cleanHtmlText } from '../utils/textUtils';
 
 interface IkasProduct {
   id: string;
@@ -112,7 +113,7 @@ export const IkasProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const transformedProducts: ProductData[] = ikasProducts.map((product: IkasProduct, index: number) => ({
           id: parseInt(product.id) || index + 1,
           name: product.name || 'İsimsiz Ürün',
-          description: product.description || undefined, // ✅ API'den gelen açıklama
+          description: product.description ? cleanHtmlText(product.description) : undefined, // ✅ HTML temizliği
           price: product.variants?.[0]?.prices?.[0]?.sellPrice || 299.99,
           image: 'https://www.calformat.com/calformat.webp',
           rating: 4.8,
@@ -141,7 +142,7 @@ export const IkasProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const transformedProducts: ProductData[] = fallbackProducts.map((product: any, index: number) => ({
             id: parseInt(product.id) || index + 1,
             name: product.name || 'CalFormat Ürün',
-            description: product.description || undefined, // ✅ Fallback description
+            description: product.description ? cleanHtmlText(product.description) : undefined, // ✅ Fallback HTML temizliği
             price: product.variants?.[0]?.prices?.sellPrice || product.variants?.[0]?.prices?.[0]?.sellPrice || 299.99,
             image: 'https://www.calformat.com/calformat.webp',
             rating: 4.8,

@@ -4,7 +4,7 @@ import { Calendar, User, Tag, ArrowRight, Loader2, Trash2, Edit } from 'lucide-r
 import { useBlog } from '../../contexts/BlogContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { deleteBlog } from '../../services/blogService';
-import { sanitizeHTML } from '../../utils/security';
+import { cleanAndTruncateHtml } from '../../utils/textUtils';
 import SEO from '../common/SEO';
 
 const BlogList: React.FC = () => {
@@ -227,7 +227,7 @@ const BlogList: React.FC = () => {
                     </h2>
 
                     <p className="text-gray-600 mb-4 line-clamp-3">
-                      {blog.excerpt}
+                      {blog.excerpt ? cleanAndTruncateHtml(blog.excerpt, 25) : 'Blog özeti yok'}
                     </p>
 
                     {/* Tags */}

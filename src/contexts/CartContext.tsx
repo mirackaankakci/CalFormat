@@ -147,11 +147,32 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error('Sepetiniz boş');
       }
 
-      // Adres validasyonu - city ve district id'leri zorunlu
+      // ✅ GELİŞTİRİLMİŞ ADRES VALİDASYONU
       if (!orderData.shippingCityId || !orderData.shippingDistrictId) {
         throw new Error('İl ve ilçe seçimi zorunludur');
       }
 
+      // ✅ İKAS ID FORMAT KONTROLÜ
+      const isValidIkasId = (id: string) => {
+        // İkas UUID formatı veya özel format kontrolü
+        return id && (
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+          /^fb[0-9a-f]{6}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+          /^\d+-\d+$/.test(id) // "34-020" formatı
+        );
+      };
+
+      if (!isValidIkasId(orderData.shippingCityId)) {
+        console.warn('⚠️ Geçersiz şehir ID:', orderData.shippingCityId);
+        throw new Error('Geçersiz şehir seçimi. Lütfen şehir seçimini tekrar yapın.');
+      }
+
+      if (!isValidIkasId(orderData.shippingDistrictId)) {
+        console.warn('⚠️ Geçersiz ilçe ID:', orderData.shippingDistrictId);
+        throw new Error('Geçersiz ilçe seçimi. Lütfen ilçe seçimini tekrar yapın.');
+      }
+
+      // ✅ ADRES BİLGİLERİNİ DOĞRULA
       if (!orderData.shippingCity || !orderData.shippingDistrict) {
         throw new Error('İl ve ilçe adları zorunludur');
       }
@@ -168,7 +189,78 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const shipping = total > 150 ? 0 : 29.90;
       const finalTotal = total + shipping;
 
-      // Sipariş payload'ını hazırla - İkas API formatına göre
+      // ✅ GELİŞTİRİLMİŞ ADRES YAPISI - İKAS API FORMATINA UYGUN
+      const shippingAddress = {
+        firstName: orderData.firstName,
+        lastName: orderData.lastName,
+        addressLine1: orderData.shippingAddress,
+        addressLine2: orderData.shippingAddressLine2 || "", // İsteğe bağlı alan
+        city: {
+          id: orderData.shippingCityId,
+          name: orderData.shippingCity
+        },
+        country: {
+          id:"da8c5f2a-8d37-48a8-beff-6ab3793a1861",
+          name: "Türkiye"
+  
+        },
+        district: {
+          id: orderData.shippingDistrictId,
+          name: orderData.shippingDistrict
+        },
+        state: {
+          id: "da8c5f2a-8d37-48a8-beff-6ab3793a1861"// State olarak şehir adını kullan
+        },
+        phone: orderData.phone,
+        company: orderData.isCompany ? orderData.companyName : null,
+        isDefault: false
+      };
+
+      // Fatura adresi - aynı veya farklı olabilir  
+      const billingAddress = orderData.isDifferentBillingAddress ? {
+        firstName: orderData.firstName,
+        lastName: orderData.lastName,
+        addressLine1: orderData.billingAddress,
+        addressLine2: orderData.billingAddressLine2 || "",
+        city: {
+          id: orderData.billingCityId || orderData.shippingCityId,
+          name: orderData.billingCity || orderData.shippingCity
+        },
+        country: {
+          name: "Türkiye",
+          id: "da8c5f2a-8d37-48a8-beff-6ab3793a1861"
+        },
+        district: {
+          id: orderData.billingDistrictId || orderData.shippingDistrictId,
+          name: orderData.billingDistrict || orderData.shippingDistrict
+        },
+        state: {
+          id: "da8c5f2a-8d37-48a8-beff-6ab3793a1861",
+          name: "Default",
+       // State olarak şehir adını kullan
+        },
+        company: orderData.isCompany ? orderData.companyName : null,
+        isDefault: false
+      } : shippingAddress;
+
+      // ✅ DEBUG LOGLARI - ADRES YAPILARINI KONTROL ET
+      console.log('📍 Adres Yapıları Kontrolü:', {
+        shippingAddress,
+        billingAddress,
+        orderData_cities: {
+          shipping: { id: orderData.shippingCityId, name: orderData.shippingCity },
+          billing: { id: orderData.billingCityId, name: orderData.billingCity }
+        },
+        orderData_districts: {
+          shipping: { id: orderData.shippingDistrictId, name: orderData.shippingDistrict },
+          billing: { id: orderData.billingDistrictId, name: orderData.billingDistrict }
+        },
+        country: { id: "dcb9135c-4b84-4c06-9a42-f359317a9b78", name: "Türkiye" },
+        state: { id: "da8c5f2a-8d37-48a8-beff-6ab3793a1861", name: orderData.shippingCity },
+        company: orderData.isCompany ? orderData.companyName : null
+      });
+
+      // ✅ İYİLEŞTİRİLMİŞ SİPARİŞ PAYLOAD
       const orderPayload = {
         input: {
           order: {
@@ -185,47 +277,14 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 id: productId,
                 price: Math.round(item.price), // Tam sayı olarak
                 variant: {
-                  id: item.variantId || "7868c357-4726-432a-ad5d-49619e6a508b" // Dinamik variant ID, fallback ile
+                  id: item.variantId || "7868c357-4726-432a-ad5d-49619e6a508b"
                 },
                 quantity: item.quantity
               };
             }),
-            billingAddress: {
-              addressLine1: orderData.isDifferentBillingAddress ? orderData.billingAddress : orderData.shippingAddress,
-              city: {
-                id: orderData.isDifferentBillingAddress ? orderData.billingCityId : orderData.shippingCityId,
-                name: orderData.isDifferentBillingAddress ? orderData.billingCity : orderData.shippingCity
-              },
-              country: {
-                name: "Türkiye" // Ülke her zaman Türkiye
-              },
-              district: {
-                id: orderData.isDifferentBillingAddress ? orderData.billingDistrictId : orderData.shippingDistrictId,
-                name: orderData.isDifferentBillingAddress ? orderData.billingDistrict : orderData.shippingDistrict
-              },
-              firstName: orderData.firstName,
-              lastName: orderData.lastName,
-              isDefault: false
-            },
-            shippingAddress: {
-              addressLine1: orderData.shippingAddress,
-              city: {
-                id: orderData.shippingCityId,
-                name: orderData.shippingCity
-              },
-              country: {
-                name: "Türkiye" // Ülke her zaman Türkiye
-              },
-              district: {
-                id: orderData.shippingDistrictId,
-                name: orderData.shippingDistrict
-              },
-              firstName: orderData.firstName,
-              lastName: orderData.lastName,
-              phone: orderData.phone,
-              isDefault: false
-            },
-            note: "test siparişi",
+            billingAddress: billingAddress,
+            shippingAddress: shippingAddress,
+            note: `CalFormat siparişi - ${orderData.shippingCity}/${orderData.shippingDistrict}`, // Daha açıklayıcı not
             deleted: false,
             customer: {
               lastName: orderData.lastName,
@@ -240,6 +299,24 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ]
         }
       };
+
+      // ✅ DEBUG LOGLARI - ADRES BİLGİLERİNİ DETAYLI GÖSTER
+      console.log('📍 Adres Bilgileri Kontrolü:', {
+        shipping: {
+          cityId: orderData.shippingCityId,
+          cityName: orderData.shippingCity,
+          districtId: orderData.shippingDistrictId,
+          districtName: orderData.shippingDistrict
+        },
+        billing: orderData.isDifferentBillingAddress ? {
+          cityId: orderData.billingCityId,
+          cityName: orderData.billingCity,
+          districtId: orderData.billingDistrictId,
+          districtName: orderData.billingDistrict
+        } : 'Teslimat adresi ile aynı',
+        payload_shipping: orderPayload.input.order.shippingAddress,
+        payload_billing: orderPayload.input.order.billingAddress
+      });
 
       console.log('📦 Sipariş payload:', orderPayload);
 

@@ -38,17 +38,7 @@ import Register from './components/pages/Register';
 import Profile from './components/pages/Profile';
 import Unauthorized from './components/pages/Unauthorized';
 import VerifyEmail from './components/pages/VerifyEmail';
-import AdminDebug from './components/pages/AdminDebug';
 import AdminShippingSettings from './components/pages/AdminShippingSettings';
-
-
-// ✅ Blog migration script'i - geliştirme için
-import addSlugsToExistingBlogs from './scripts/addSlugsToBlogs';
-
-// ✅ Migration script'i global olarak erişilebilir yap
-if (typeof window !== 'undefined') {
-  (window as any).addSlugsToExistingBlogs = addSlugsToExistingBlogs;
-}
 
 
 // Ana sayfa bileşeni
@@ -245,9 +235,6 @@ const AppContent = () => {
               </ProtectedRoute>
             } 
           />
-          
-          {/* Debug route - geliştirme için */}
-          <Route path="/admin/debug" element={<AdminDebug />} />
           
           {/* Admin Shipping Settings */}
           <Route 

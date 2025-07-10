@@ -4,6 +4,7 @@ import { benefits } from '../../data/benefits';
 import { useCart } from '../../contexts/CartContext';
 import { useNavigate } from 'react-router-dom';
 import { useIkas } from '../../contexts/IkasContext';
+import { cleanAndTruncateHtml } from '../../utils/textUtils';
 
 interface HeroSectionProps {
   isVisible: boolean;
@@ -65,8 +66,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ isVisible }) => {
                   {product.name.includes('Temizleme') ? 'Temizleme Tozu' : product.name}
                 </span>
               </h2>              <p className="text-xl text-gray-600 leading-relaxed">
-                {product.description || (
-                  // Son fallback açıklama
+                {/* HTML etiketlerini temizle ve düzgün formatlayın */}
+                {product.description ? (
+                  // HTML etiketlerini temizle ve metin olarak göster
+                  cleanAndTruncateHtml(product.description, 35)
+                ) : (
+                  // Fallback açıklama
                   <>
                     Doğal bileşenlerle hazırlanmış özel formülümüz ile meyve ve sebzelerinizdeki 
                     <span className="font-semibold text-[#ee7f1a]"> pestisit, balmumu ve zararlı kalıntıları</span> etkili şekilde temizleyin.

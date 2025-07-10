@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Check, User, MapPin, Loader2, Lock, AlertCircle } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useAddress } from '../../hooks/useAddress';
-import sipayService, { SiPayPaymentData } from '../../services/sipayService';
+import sipayService, { SiPayPaymentData } from '../../services/siPayService';
 import configService from '../../services/configService';
 
 const Checkout: React.FC = () => {
@@ -41,6 +41,7 @@ const Checkout: React.FC = () => {
     taxNumber: '',
     taxOffice: '',
     address: '',
+    addressLine2: '',
     notes: '',
     kvkkConsent: false,
     salesAgreementConsent: false,
@@ -105,17 +106,50 @@ const Checkout: React.FC = () => {
             // Sipariş oluşturma API'sini çağır
             console.log('📦 3D ödeme sonrası sipariş oluşturuluyor...');
             
-            // Adres seçimi validasyonu
+            // ✅ GELİŞTİRİLMİŞ ADRES VALİDASYONU
             if (!savedSelectedCity || !savedSelectedDistrict) {
               throw new Error('Adres bilgileri eksik');
             }
 
-            // Adres bilgilerini parse et
+            // ✅ İKAS ID FORMAT KONTROLÜ
+            const isValidIkasId = (id: string) => {
+              return id && (
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+                /^fb[0-9a-f]{6}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+                /^\d+-\d+$/.test(id)
+              );
+            };
+
+            if (!isValidIkasId(savedSelectedCity)) {
+              console.warn('⚠️ 3D ödeme sonrası geçersiz şehir ID:', savedSelectedCity);
+              throw new Error('Geçersiz şehir seçimi. Lütfen şehir seçimini tekrar yapın.');
+            }
+
+            if (!isValidIkasId(savedSelectedDistrict)) {
+              console.warn('⚠️ 3D ödeme sonrası geçersiz ilçe ID:', savedSelectedDistrict);
+              throw new Error('Geçersiz ilçe seçimi. Lütfen ilçe seçimini tekrar yapın.');
+            }
+
+            // ✅ ADRES BİLGİLERİNİ DOĞRULA
+            if (!savedSelectedNames.cityName || !savedSelectedNames.districtName) {
+              throw new Error('İl ve ilçe adları zorunludur');
+            }
+
+            // Adres bilgilerini parse et - İkas API formatına uygun
             const savedAddressInfo = {
               city: { id: savedSelectedCity, name: savedSelectedNames.cityName },
               district: { id: savedSelectedDistrict, name: savedSelectedNames.districtName },
               town: { id: savedSelectedTown || '', name: savedSelectedNames.townName || '' }
             };
+
+            // ✅ DEBUG LOGLARI - 3D ÖDEME SONRASI ADRES BİLGİLERİ
+            console.log('📍 3D Ödeme Sonrası Adres Bilgileri:', {
+              savedSelectedCity,
+              savedSelectedDistrict,
+              savedSelectedTown,
+              savedAddressInfo,
+              savedSelectedNames
+            });
 
             const orderPayload = {
               firstName: savedFormData.firstName,
@@ -123,16 +157,16 @@ const Checkout: React.FC = () => {
               email: savedFormData.email,
               phone: savedFormData.phone,
               shippingAddress: savedFormData.address,
-              shippingAddressLine2: '',
+              shippingAddressLine2: savedFormData.addressLine2 || '',
               shippingCity: savedAddressInfo.city.name,
               shippingDistrict: savedAddressInfo.district.name,
-              shippingTown: savedAddressInfo.town.name,
+              shippingTown: savedAddressInfo.town.name || '',
               shippingPostalCode: '34000',
               shippingCityId: savedAddressInfo.city.id,
               shippingDistrictId: savedAddressInfo.district.id,
-              shippingTownId: savedAddressInfo.town.id,
+              shippingTownId: savedAddressInfo.town.id || '',
               billingAddress: savedFormData.address,
-              billingAddressLine2: '',
+              billingAddressLine2: savedFormData.addressLine2 || '',
               billingCity: savedAddressInfo.city.name,
               billingDistrict: savedAddressInfo.district.name,
               billingPostalCode: '34000',
@@ -231,8 +265,37 @@ const Checkout: React.FC = () => {
         return false;
       }
       
+      // ✅ GELİŞTİRİLMİŞ ADRES VALİDASYONU
       if (!selectedCity || !selectedDistrict) {
         setOrderError('Lütfen şehir ve ilçe seçimi yapın');
+        return false;
+      }
+
+      // ✅ İKAS ID FORMAT KONTROLÜ
+      const isValidIkasId = (id: string) => {
+        return id && (
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+          /^fb[0-9a-f]{6}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+          /^\d+-\d+$/.test(id)
+        );
+      };
+
+      if (!isValidIkasId(selectedCity)) {
+        console.warn('⚠️ Form validation - Geçersiz şehir ID:', selectedCity);
+        setOrderError('Geçersiz şehir seçimi. Lütfen şehir seçimini tekrar yapın.');
+        return false;
+      }
+
+      if (!isValidIkasId(selectedDistrict)) {
+        console.warn('⚠️ Form validation - Geçersiz ilçe ID:', selectedDistrict);
+        setOrderError('Geçersiz ilçe seçimi. Lütfen ilçe seçimini tekrar yapın.');
+        return false;
+      }
+
+      // ✅ ADRES İSİMLERİNİ KONTROL ET
+      const addressInfo = getSelectedAddressInfo();
+      if (!addressInfo.city.name || !addressInfo.district.name) {
+        setOrderError('İl ve ilçe adları zorunludur. Lütfen seçimlerinizi kontrol edin.');
         return false;
       }
       
@@ -240,6 +303,15 @@ const Checkout: React.FC = () => {
         setOrderError('Lütfen sözleşme onaylarını verin');
         return false;
       }
+
+      // ✅ DEBUG LOGLARI
+      console.log('📍 Form Validation Adres Bilgileri:', {
+        selectedCity,
+        selectedDistrict,
+        addressInfo,
+        cityName: addressInfo.city.name,
+        districtName: addressInfo.district.name
+      });
       
       return true;
     }
@@ -398,29 +470,64 @@ const Checkout: React.FC = () => {
         try {
           console.log('📦 Sipariş oluşturuluyor...');
           
-          // Adres seçimi validasyonu
+          // ✅ GELİŞTİRİLMİŞ ADRES VALİDASYONU
           if (!selectedCity || !selectedDistrict) {
             throw new Error('Lütfen il ve ilçe seçimi yapınız');
           }
 
+          // ✅ İKAS ID FORMAT KONTROLÜ
+          const isValidIkasId = (id: string) => {
+            return id && (
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+              /^fb[0-9a-f]{6}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+              /^\d+-\d+$/.test(id)
+            );
+          };
+
+          if (!isValidIkasId(selectedCity)) {
+            console.warn('⚠️ Geçersiz şehir ID:', selectedCity);
+            throw new Error('Geçersiz şehir seçimi. Lütfen şehir seçimini tekrar yapın.');
+          }
+
+          if (!isValidIkasId(selectedDistrict)) {
+            console.warn('⚠️ Geçersiz ilçe ID:', selectedDistrict);
+            throw new Error('Geçersiz ilçe seçimi. Lütfen ilçe seçimini tekrar yapın.');
+          }
+
           const addressInfo = getSelectedAddressInfo();
 
+          // ✅ ADRES BİLGİLERİNİ DOĞRULA
+          if (!addressInfo.city.name || !addressInfo.district.name) {
+            throw new Error('İl ve ilçe adları zorunludur');
+          }
+
+          // ✅ DEBUG LOGLARI - ADRES BİLGİLERİNİ DETAYLI GÖSTER
+          console.log('📍 Checkout Adres Bilgileri:', {
+            selectedCity,
+            selectedDistrict,
+            selectedTown,
+            addressInfo,
+            cityName: addressInfo.city.name,
+            districtName: addressInfo.district.name
+          });
+
+          // Adres bilgilerini doğru şekilde hazırla - İkas API formatına uygun
           const orderPayload = {
             firstName: formData.firstName,
             lastName: formData.lastName,
             email: formData.email,
             phone: formData.phone,
             shippingAddress: formData.address,
-            shippingAddressLine2: '',
+            shippingAddressLine2: formData.addressLine2 || '',
             shippingCity: addressInfo.city.name,
             shippingDistrict: addressInfo.district.name,
-            shippingTown: addressInfo.town.name,
+            shippingTown: addressInfo.town.name || '',
             shippingPostalCode: '34000',
             shippingCityId: addressInfo.city.id,
             shippingDistrictId: addressInfo.district.id,
-            shippingTownId: addressInfo.town.id,
-            billingAddress: formData.address, // Varsayılan olarak aynı adres
-            billingAddressLine2: '',
+            shippingTownId: addressInfo.town.id || '',
+            billingAddress: formData.address,
+            billingAddressLine2: formData.addressLine2 || '',
             billingCity: addressInfo.city.name,
             billingDistrict: addressInfo.district.name,
             billingPostalCode: '34000',
@@ -822,6 +929,18 @@ const Checkout: React.FC = () => {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                         placeholder="Sokak, cadde, kapı no vb."
                         required
+                      />
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Adres Detayı 2 (İsteğe Bağlı)</label>
+                      <textarea
+                        name="addressLine2"
+                        value={formData.addressLine2}
+                        onChange={handleInputChange}
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                        placeholder="Apartman, daire, kat bilgisi vb."
                       />
                     </div>
 

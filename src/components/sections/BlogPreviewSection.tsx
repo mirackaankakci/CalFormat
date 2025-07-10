@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, User, ArrowRight, ChevronRight } from 'lucide-react';
 import { Blog, getBlogs } from '../../services/blogService';
+import { cleanAndTruncateHtml } from '../../utils/textUtils';
 
 const BlogPreviewSection: React.FC = () => {
   const [recentBlogs, setRecentBlogs] = useState<Blog[]>([]);
@@ -134,7 +135,7 @@ const BlogPreviewSection: React.FC = () => {
 
                   {/* Özet */}
                   <p className="text-gray-600 mb-6 line-clamp-3 leading-relaxed">
-                    {blog.excerpt}
+                    {blog.excerpt ? cleanAndTruncateHtml(blog.excerpt, 20) : 'Blog özeti yok'}
                   </p>
 
                   {/* Devamını Oku Butonu */}
