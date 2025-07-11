@@ -1,21 +1,18 @@
-# Güvenlik ayarları
-Header always unset Content-Security-Policy
-Header always unset X-Content-Security-Policy  
-Header always unset X-WebKit-CSP
-Header always unset X-Frame-Options
-Header always unset Strict-Transport-Security
-Header always unset X-XSS-Protection
-Header always unset X-Content-Type-Options
-Header always unset Referrer-Policy
+# CalFormat Production .htaccess - Güvenlik ve Performance
+RewriteEngine On
 
-# Güvenlik header'ları
-Header always set X-Frame-Options "ALLOWALL"
+# Production Security Headers
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options SAMEORIGIN
+Header always set X-XSS-Protection "1; mode=block"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
 
-# Meta refresh ve form-action için izin ver
-Header always set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' *; script-src 'self' 'unsafe-inline' 'unsafe-eval' *; style-src 'self' 'unsafe-inline' *; img-src 'self' data: *; connect-src 'self' *; form-action 'self' *; frame-src 'self' *; object-src 'none';"
+# Content Security Policy (Production)
+Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src 'self' https:; object-src 'none';"
 
-# CORS ayarları
-Header always set Access-Control-Allow-Origin "*"
+# CORS ayarları (Production - Daha kısıtlı)
+Header always set Access-Control-Allow-Origin "https://calformat.com.tr"
 Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
 Header always set Access-Control-Allow-Headers "Origin, Content-Type, Accept, Authorization, X-Request-With"
 Header always set Access-Control-Allow-Credentials "true"

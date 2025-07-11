@@ -26,7 +26,7 @@ return [
         'client_id' => getenv('IKAS_CLIENT_ID') ?: '9ca242da-2ce0-44b5-8b3f-4d31e6a94958',
         'client_secret' => getenv('IKAS_CLIENT_SECRET') ?: 's_TBvX9kDl7N8FPXlSHp1L3dHFbd1c286fbfb440aa9796a8b851994b32',
         'api_token' => getenv('IKAS_API_TOKEN') ?: 'your_ikas_api_token',
-        'test_mode' => true, // Geçici olarak true yapıldı
+        'test_mode' => false, // PRODUCTION MODU
         
         // API URL'leri
         'token_url' => 'https://calformat.myikas.com/api/admin/oauth/token',
@@ -51,16 +51,16 @@ return [
     
     // SiPay Ödeme Sistemi
     'sipay' => [
-        'test_mode' => getenv('SIPAY_TEST_MODE') !== 'false', // Test modunda - true olarak değiştirildi
-        'base_url' => getenv('SIPAY_BASE_URL') ?: 'https://provisioning.sipay.com.tr/ccpayment',
+        'test_mode' => false, // PRODUCTION MODU
+        'base_url' => getenv('SIPAY_BASE_URL') ?: 'https://app.sipay.com.tr/ccpayment',
         
-        // Test Üye İşyeri Bilgileri (SiPay resmi test bilgileri)
-        'app_id' => getenv('SIPAY_APP_ID') ?: '6d4a7e9374a76c15260fcc75e315b0b9', // APP KEY
-        'app_secret' => getenv('SIPAY_APP_SECRET') ?: 'b46a67571aa1e7ef5641dc3fa6f1712a', // APP SECRET
-        'merchant_key' => getenv('SIPAY_MERCHANT_KEY') ?: '$2y$10$HmRgYosneqcwHj.UH7upGuyCZqpQ1ITgSMj9Vvxn.t6f.Vdf2SQFO',
-        'merchant_id' => getenv('SIPAY_MERCHANT_ID') ?: '18309',
+        // PRODUCTION Üye İşyeri Bilgileri - SiPay'den alınacak
+        'app_id' => getenv('SIPAY_APP_ID') ?: 'e19759a62999b8df7d52eccfb4ef84ee', // Production App ID
+        'app_secret' => getenv('SIPAY_APP_SECRET') ?: 'd5b0fcc23409624afda95346573fe45e', // Production App Secret
+        'merchant_key' => getenv('SIPAY_MERCHANT_KEY') ?: '$2y$10$FF.kEML08eIwoWrSBRNB6.k1LOnX6yekGmB3wjDTe6c22Aaent8US', // PRODUCTION MERCHANT KEY
+        'merchant_id' => getenv('SIPAY_MERCHANT_ID') ?: '27386930', // Production Merchant ID
         
-        // API URL'leri
+        // API URL'leriyyy
         'token_url' => '/api/token',
         'payment_2d_url' => '/api/paySmart2D',
         'payment_3d_url' => '/api/paySmart3D',
@@ -73,14 +73,18 @@ return [
         'payment_methods' => ['2D', '3D'],
         'max_installments' => 12,
         
-        // Webhook URL'leri
+        // Hash Key - Otomatik oluşturulur, manuel değer gerekmez
+        // 'hash_key' => getenv('SIPAY_HASH_KEY') ?: 'AUTO_GENERATED', // Hash key otomatik oluşturulur
+        
+        // Webhook URL'leri - PRODUCTION
         'webhook_url' => getenv('SIPAY_WEBHOOK_URL') ?: 'https://calformat.com.tr/sipay_webhook.php',
         'return_url' => getenv('SIPAY_RETURN_URL') ?: 'https://calformat.com.tr/sipay_3d_return.php',
         
-        // Test kartları (sadece test modunda kullanılır)
+        // Test kartları (sadece test modunda kullanılır) - SiPay resmi test kartları
         'test_cards' => [
-            'visa' => '4111111111111111',
-            'mastercard' => '5555555555554444',
+            'visa_primary' => '4508034508034509', // SiPay resmi test kartı
+            'visa_secondary' => '4111111111111111', // Alternatif test kartı
+            'mastercard' => '5406675406675403', // SiPay Mastercard test kartı
             'amex' => '378282246310005'
         ]
     ],
@@ -88,18 +92,18 @@ return [
     // Genel Ayarlar
     'general' => [
         'currency' => 'TRY',
-        'default_shipping_cost' => 29.90,
+        'default_shipping_cost' => 0.00, // ✅ Düzeltildi: Ücretsiz kargo için 0₺
         'free_shipping_threshold' => 150.00, // ✅ Düzeltildi: 150₺ üzeri ücretsiz kargo
         'timezone' => 'Europe/Istanbul',
-        'debug_mode' => getenv('DEBUG_MODE') === 'true'
+        'debug_mode' => false // PRODUCTION - Debug kapalı
     ],
     
-    // Frontend URL - Geçici olarak IP adresi kullan
-    'frontend_url' => getenv('FRONTEND_URL') ?: 'http://89.252.132.90',
+    // Frontend URL - PRODUCTION
+    'frontend_url' => getenv('FRONTEND_URL') ?: 'https://calformat.com.tr',
     
     // Güvenlik Ayarları
     'security' => [
-        'allowed_origins' => explode(',', getenv('ALLOWED_ORIGINS') ?: 'http://localhost:5173,http://localhost:3000,https://calformat.com.tr,https://www.calformat.com.tr'),
+        'allowed_origins' => explode(',', getenv('ALLOWED_ORIGINS') ?: 'https://calformat.com.tr,https://www.calformat.com.tr'),
         'hash_algorithm' => 'sha256',
         'encryption_key' => getenv('ENCRYPTION_KEY') ?: 'CalFormat2024!@#$',
         'rate_limit' => [

@@ -14,8 +14,11 @@
 // Güvenlik modülünü yükle
 require_once __DIR__ . '/security_new.php';
 
+// Production error handling
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Production'da 0
+ini_set('display_errors', 0); // Production'da her zaman 0
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/logs/php_errors.log');
 
 // CORS ve JSON headers
 header('Content-Type: application/json; charset=utf-8');
@@ -37,8 +40,7 @@ try {
     $sipayConfig['check_status_url'] = $sipayConfig['base_url'] . $sipayConfig['check_status_url'];
 
     /**
-     * SiPay Token Alma - 2 saat geçerlilik
-     * Her token 2 saat geçerli olduğu için cache mekanizması kullanılabilir
+     * SiPay Token Alma - En Basit, Filtresiz Yöntem
      */
     function getSipayToken($config) {
         $tokenData = [
@@ -46,24 +48,14 @@ try {
             'app_secret' => $config['app_secret']
         ];
 
-        if (!function_exists('curl_init')) {
-            throw new Exception('cURL extension gerekli');
-        }
-
         $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $config['token_url'],
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($tokenData),
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Accept: application/json',
-                'User-Agent: CalFormat-SiPay/1.0'
-            ]
-        ]);
+        curl_setopt($ch, CURLOPT_URL, $config['token_url']);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($tokenData));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -71,22 +63,25 @@ try {
         curl_close($ch);
 
         if ($error) {
-            throw new Exception('Token alma hatası: ' . $error);
+            throw new Exception('cURL: ' . $error);
         }
 
         if ($httpCode !== 200) {
-            throw new Exception('Token HTTP hatası: ' . $httpCode);
+            throw new Exception('HTTP: ' . $httpCode . ' - ' . $response);
         }
 
         $data = json_decode($response, true);
-        if (!$data || !isset($data['data']['token'])) {
-            throw new Exception('Token response formatı hatalı');
+        if (!$data) {
+            throw new Exception('JSON: ' . json_last_error_msg() . ' - RAW: ' . $response);
         }
 
+        // Hiçbir filtreleme yapmadan direk döndür - ne gelirse kabul et
         return [
-            'token' => $data['data']['token'],
-            'is_3d' => $data['data']['is_3d'] ?? 1, // 0=Sadece 2D, 1=2D+3D, 2=Sadece 3D, 4=Markalı
-            'expires_at' => time() + (2 * 60 * 60) // 2 saat sonra
+            'token' => $data['data']['token'] ?? $data['token'] ?? $data['access_token'] ?? 'NO_TOKEN_FOUND',
+            'expires_in' => 7200,
+            'is_3d' => $data['data']['is_3d'] ?? 1, // 3D desteği varsayılan olarak aktif
+            'expires_at' => time() + 7200,
+            'raw_data' => $data  // Ham veriyi de döndür debug için
         ];
     }
 
@@ -95,22 +90,57 @@ try {
      * 3D ödeme ve güvenlik doğrulaması için gerekli
      */
     function generateHashKey($total, $installment, $currency_code, $merchant_key, $invoice_id, $app_secret) {
+        // Debug için hash generation adımlarını logla
+        securityLog('Hash generation debug start', 'INFO', [
+            'total' => $total,
+            'installment' => $installment,
+            'currency_code' => $currency_code,
+            'merchant_key_preview' => substr($merchant_key, 0, 10) . '...',
+            'invoice_id' => $invoice_id,
+            'app_secret_preview' => substr($app_secret, 0, 10) . '...'
+        ]);
+        
         $data = $total . '|' . $installment . '|' . $currency_code . '|' . $merchant_key . '|' . $invoice_id;
+
+        securityLog('Hash generation data prepared', 'INFO', [
+            'data_string' => $data,
+            'data_length' => strlen($data)
+        ]);
 
         $iv = substr(sha1(mt_rand()), 0, 16);
         $password = sha1($app_secret);
 
+        securityLog('Hash generation password created', 'INFO', [
+            'iv' => $iv,
+            'password_preview' => substr($password, 0, 10) . '...',
+            'password_length' => strlen($password)
+        ]);
+
         $salt = substr(sha1(mt_rand()), 0, 4);
         $saltWithPassword = hash('sha256', $password . $salt);
+
+        securityLog('Hash generation salt processed', 'INFO', [
+            'original_salt' => $salt,
+            'processed_salt_preview' => substr($saltWithPassword, 0, 10) . '...'
+        ]);
 
         $encrypted = openssl_encrypt($data, 'aes-256-cbc', $saltWithPassword, 0, $iv);
         
         if ($encrypted === false) {
+            securityLog('Hash generation encryption failed', 'ERROR', [
+                'openssl_error' => openssl_error_string()
+            ]);
             throw new Exception('Hash key şifreleme hatası');
         }
 
         $msg_encrypted_bundle = "$iv:$salt:$encrypted";
         $msg_encrypted_bundle = str_replace('/', '__', $msg_encrypted_bundle);
+
+        securityLog('Hash generation completed', 'INFO', [
+            'original_bundle_length' => strlen("$iv:$salt:$encrypted"),
+            'final_bundle_length' => strlen($msg_encrypted_bundle),
+            'final_bundle_preview' => substr($msg_encrypted_bundle, 0, 50) . '...'
+        ]);
 
         return $msg_encrypted_bundle;
     }
@@ -211,7 +241,20 @@ try {
         ]);
 
         if ($error) {
+            securityLog('2D Payment cURL error', 'ERROR', [
+                'error' => $error,
+                'url' => $config['payment_2d_url'],
+                'invoice_id' => $paymentData['invoice_id']
+            ]);
             throw new Exception('2D Ödeme cURL hatası: ' . $error);
+        }
+
+        if ($httpCode !== 200) {
+            securityLog('2D Payment HTTP error', 'ERROR', [
+                'http_code' => $httpCode,
+                'response' => $response,
+                'invoice_id' => $paymentData['invoice_id']
+            ]);
         }
 
         $responseData = json_decode($response, true);
@@ -220,9 +263,19 @@ try {
         if (json_last_error() !== JSON_ERROR_NONE) {
             securityLog('2D Payment JSON decode error', 'ERROR', [
                 'json_error' => json_last_error_msg(),
-                'raw_response' => substr($response, 0, 500)
+                'raw_response' => substr($response, 0, 500),
+                'invoice_id' => $paymentData['invoice_id']
             ]);
         }
+        
+        // Detaylı response analizi
+        securityLog('2D Payment detailed response', 'INFO', [
+            'response_data' => $responseData,
+            'invoice_id' => $paymentData['invoice_id'],
+            'status_code' => $responseData['status_code'] ?? 'not_set',
+            'sipay_status' => $responseData['data']['sipay_status'] ?? $responseData['sipay_status'] ?? 'not_set',
+            'message' => $responseData['message'] ?? $responseData['data']['message'] ?? 'no_message'
+        ]);
         
         // Sipay response format kontrolü
         // status_code: 100 = başarılı, sipay_status: 1 = başarılı
@@ -231,6 +284,18 @@ try {
             (isset($responseData['data']['sipay_status']) && $responseData['data']['sipay_status'] == 1) ||
             (isset($responseData['sipay_status']) && $responseData['sipay_status'] == 1)
         ));
+        
+        // Başarısızlık durumunu detaylı logla
+        if (!$isSuccess) {
+            securityLog('2D Payment failed', 'ERROR', [
+                'http_code' => $httpCode,
+                'status_code' => $responseData['status_code'] ?? 'not_set',
+                'sipay_status' => $responseData['data']['sipay_status'] ?? $responseData['sipay_status'] ?? 'not_set',
+                'error_message' => $responseData['message'] ?? $responseData['data']['message'] ?? 'no_message',
+                'full_response' => $responseData,
+                'invoice_id' => $paymentData['invoice_id']
+            ]);
+        }
         
         return [
             'success' => $isSuccess,
@@ -243,17 +308,15 @@ try {
     }
 
     /**
-     * 3D (Secure) Ödeme İşlemi - HTML Form Döndürür
-     * Güvenli ödeme - SMS doğrulama ile banka sayfasına yönlendirme
+     * 3D (Secure) Ödeme İşlemi - SiPay API'ye Request
+     * SiPay API'sinden 3D form HTML'i alır ve döndürür
      */
     function process3DPayment($paymentData, $token, $config) {
-        // Items'i doğru formatta hazırla - Sipay ARRAY bekliyor!
+        // Items'i doğru formatta hazırla
         if (is_string($paymentData['items'])) {
-            // Eğer string ise array'e çevir
             $paymentData['items'] = json_decode($paymentData['items'], true) ?: [];
         }
         
-        // Items'in array olduğundan emin ol
         if (!is_array($paymentData['items'])) {
             $paymentData['items'] = [];
         }
@@ -261,21 +324,249 @@ try {
         // 3D ödeme için IP ekle
         $paymentData['ip'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 
-        // 3D ödeme HTML formu oluştur
-        $formHtml = generate3DPaymentForm($paymentData, $config, $token);
+        // Debug: 3D ödeme verilerini logla
+        securityLog('3D Payment data prepared', 'INFO', [
+            'invoice_id' => $paymentData['invoice_id'],
+            'total' => $paymentData['total'],
+            'currency_code' => $paymentData['currency_code'],
+            'installments_number' => $paymentData['installments_number'],
+            'has_hash_key' => !empty($paymentData['hash_key']),
+            'ip' => $paymentData['ip'],
+            'payment_3d_url' => $config['payment_3d_url']
+        ]);
 
-        return [
-            'success' => true,
-            'payment_type' => '3D',
-            'form_html' => $formHtml,
-            'redirect_needed' => true,
-            'hash_key' => $paymentData['hash_key'],
-            'invoice_id' => $paymentData['invoice_id']
-        ];
+        // SiPay 3D API'sine request at
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $config['payment_3d_url'],
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($paymentData),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $token,
+                'Content-Type: application/json',
+                'Accept: application/json',
+                'User-Agent: CalFormat-SiPay/1.0'
+            ]
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        // Debug: Response'u logla
+        securityLog('3D Payment API response', 'INFO', [
+            'http_code' => $httpCode,
+            'has_curl_error' => !empty($error),
+            'curl_error' => $error,
+            'response_length' => strlen($response),
+            'response_preview' => substr($response, 0, 500)
+        ]);
+
+        if ($error) {
+            throw new Exception('3D Ödeme cURL hatası: ' . $error);
+        }
+
+        if ($httpCode !== 200) {
+            throw new Exception('3D Ödeme HTTP hatası: ' . $httpCode . ' - ' . $response);
+        }
+
+        $responseData = json_decode($response, true);
+        
+        // Eğer JSON decode başarısızsa, response HTML olabilir (3D form)
+        if (!$responseData && $response) {
+            // Direkt HTML response gelmiş (3D form)
+            return [
+                'success' => true,
+                'payment_type' => '3D',
+                'form_html' => $response,
+                'redirect_needed' => true,
+                'hash_key' => $paymentData['hash_key'],
+                'invoice_id' => $paymentData['invoice_id']
+            ];
+        }
+
+        // JSON response gelmiş
+        if ($responseData) {
+            securityLog('3D Payment JSON response', 'INFO', [
+                'status_code' => $responseData['status_code'] ?? 'not_set',
+                'sipay_status' => $responseData['data']['sipay_status'] ?? $responseData['sipay_status'] ?? 'not_set',
+                'message' => $responseData['message'] ?? 'no_message',
+                'has_redirect_url' => isset($responseData['data']['redirect_url']) || isset($responseData['redirect_url']),
+                'full_response' => $responseData
+            ]);
+
+            // Başarılı 3D response kontrolü
+            $isSuccess = ($httpCode === 200 && (
+                (isset($responseData['status_code']) && $responseData['status_code'] == 100) ||
+                (isset($responseData['data']['sipay_status']) && $responseData['data']['sipay_status'] == 1) ||
+                (isset($responseData['sipay_status']) && $responseData['sipay_status'] == 1)
+            ));
+
+            if ($isSuccess) {
+                // 3D redirect URL'i varsa kullan
+                $redirectUrl = $responseData['data']['redirect_url'] ?? $responseData['redirect_url'] ?? null;
+                
+                if ($redirectUrl) {
+                    // Redirect URL ile HTML oluştur
+                    $html = generate3DRedirectHtml($redirectUrl, $paymentData);
+                    return [
+                        'success' => true,
+                        'payment_type' => '3D',
+                        'form_html' => $html,
+                        'redirect_needed' => true,
+                        'redirect_url' => $redirectUrl,
+                        'hash_key' => $paymentData['hash_key'],
+                        'invoice_id' => $paymentData['invoice_id']
+                    ];
+                }
+            }
+        }
+
+        // Başarısız 3D response
+        throw new Exception('3D Ödeme başarısız: ' . ($responseData['message'] ?? $response));
     }
 
     /**
-     * 3D Ödeme HTML Form Oluşturucu
+     * 3D Redirect HTML Oluşturucu
+     * SiPay'den gelen redirect URL'e yönlendirir
+     */
+    function generate3DRedirectHtml($redirectUrl, $paymentData) {
+        $html = '<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Güvenli Ödeme - CalFormat</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+        .payment-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: #4f46e5;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #1f2937;
+        }
+        .subtitle {
+            color: #6b7280;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #f3f4f6;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #7c3aed);
+            width: 0%;
+            animation: progress 2s ease-in-out;
+        }
+        .security-info {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #166534;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes progress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="payment-container">
+        <div class="logo">🛡️</div>
+        <h1 class="title">3D Güvenli Ödeme</h1>
+        <p class="subtitle">Bankanızın güvenli ödeme sayfasına yönlendiriliyorsunuz...</p>
+        
+        <div class="spinner"></div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
+        
+        <div class="security-info">
+            <strong>🔒 Güvenli Ödeme</strong><br>
+            Bu işlem 256-bit SSL şifreleme ile korunmaktadır<br>
+            <small>Sipariş No: ' . htmlspecialchars($paymentData['invoice_id']) . '</small>
+        </div>
+    </div>
+
+    <script>
+        // 2 saniye sonra redirect et
+        setTimeout(function() {
+            window.location.href = "' . htmlspecialchars($redirectUrl) . '";
+        }, 2000);
+        
+        // Backup - 3 saniye sonra kesin redirect
+        setTimeout(function() {
+            if (window.location.href.indexOf("' . parse_url($redirectUrl, PHP_URL_HOST) . '") === -1) {
+                window.location.href = "' . htmlspecialchars($redirectUrl) . '";
+            }
+        }, 3000);
+    </script>
+</body>
+</html>';
+
+        return $html;
+    }
+
+    /**
+     * 3D Ödeme HTML Form Oluşturucu (Eski Yöntem - Fallback)
      * Otomatik submit ile banka sayfasına yönlendirme
      */
     function generate3DPaymentForm($paymentData, $config, $token) {

@@ -58,6 +58,7 @@ export interface SiPayResponse {
   };
   error?: string;
   error_code?: string;
+  message?: string;
   timestamp: string;
 }
 
@@ -289,13 +290,19 @@ class SiPayService {
         paymentData.invoice_id = `CF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       }
 
-      // URL'leri ayarla (yoksa)
+      // URL'leri ayarla - Backend PHP dosyalarına işaret et
       if (!paymentData.cancel_url) {
-        paymentData.cancel_url = `${window.location.origin}/checkout?status=cancel&invoice_id=${paymentData.invoice_id}`;
+        paymentData.cancel_url = `${window.location.origin}/sipay_3d_return.php?status=cancel&invoice_id=${paymentData.invoice_id}`;
       }
       if (!paymentData.return_url) {
-        paymentData.return_url = `${window.location.origin}/checkout?status=success&invoice_id=${paymentData.invoice_id}`;
+        paymentData.return_url = `${window.location.origin}/sipay_3d_return.php`;
       }
+
+      console.log('📤 SiPay\'a gönderilen veri:', {
+        ...paymentData,
+        cc_no: '****' + paymentData.cc_no.slice(-4), // Güvenlik için sadece son 4 hane
+        cvv: '***' // CVV'yi gizle
+      });
 
       const response = await fetch(this.baseUrl, {
         method: 'POST',
@@ -306,11 +313,19 @@ class SiPayService {
         body: JSON.stringify(paymentData)
       });
 
+      console.log('📥 SiPay yanıt durumu:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       // 3D ödeme için HTML response kontrolü
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('text/html')) {
         // 3D ödeme HTML formu - yeni tab'da aç
         const htmlContent = await response.text();
+        console.log('🌐 3D ödeme HTML formu alındı, yeni tab açılıyor...');
+        
         const newWindow = window.open('', '_blank');
         if (newWindow) {
           newWindow.document.write(htmlContent);
@@ -327,12 +342,28 @@ class SiPayService {
 
       // JSON response (2D ödeme)
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ SiPay HTTP hatası:', {
+          status: response.status,
+          statusText: response.statusText,
+          responseText: errorText
+        });
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
       const result: SiPayResponse = await response.json();
       
       console.log('✅ SiPay ödeme yanıtı:', result);
+      
+      // Başarısızlık durumunu kontrol et
+      if (!result.success) {
+        console.error('💳 SiPay ödeme başarısız:', {
+          message: result.message,
+          error_code: result.error_code,
+          result: result
+        });
+      }
+      
       return result;
 
     } catch (error) {

@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:prod": "set NODE_ENV=production && vite build",
     "build:full": "vite build && npm run copy-php",
     "copy-php": "xcopy public\\*.php dist\\ /Y && xcopy public\\.htaccess dist\\ /Y 2>nul || echo PHP and htaccess files copied to dist",
+    "deploy": "npm run build && npm run copy-php",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "serve:prod": "vite preview --port 4173"
   },
   "dependencies": {
     "dompurify": "^3.2.6",

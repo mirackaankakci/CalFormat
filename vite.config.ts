@@ -9,27 +9,40 @@ export default defineConfig({
       '@': '/src',
     },
   },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false, // Production'da source map kapalı
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth'],
+          icons: ['lucide-react']
+        }
+      }
+    }
+  },
+  base: '/', // Production base path
   server: {
     proxy: {
-      // Tüm PHP API istekleri için genel proxy
+      // Development proxy settings
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '/public')
       },
-      // Direkt PHP dosyaları için
       '/*.php': {
         target: 'http://localhost:8000',
         changeOrigin: true,
         rewrite: (path) => `/public${path}`
       },
-      // Sipay API'leri için özel routing
       '/sipay_*.php': {
         target: 'http://localhost:8000',
         changeOrigin: true,
         rewrite: (path) => `/public${path}`
       },
-      // Ikas API'leri için özel routing
       '/ikas_*.php': {
         target: 'http://localhost:8000',
         changeOrigin: true,
