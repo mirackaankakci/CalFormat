@@ -47,11 +47,11 @@ const Checkout: React.FC = () => {
   });
 
   const [cardData, setCardData] = useState({
-    cardNumber: '',
+    cardNumber: '', // Production - Boş kart bilgileri
     cardHolder: '',
     expiryMonth: '',
     expiryYear: '',
-    cvv: '',
+    cvv: '', // Production - Gerçek CVV girilecek
     installments: 1
   });
 
@@ -91,12 +91,14 @@ const Checkout: React.FC = () => {
       
       // Sipay parametreleri (3D dönüş)
       const sipayStatus = urlParams.get('sipay_status');
+      const hashBypass = urlParams.get('hash_bypass');
       
       console.log('🔍 URL Parametreleri:', {
         status,
         invoiceId,
         orderNo,
         sipayStatus,
+        hashBypass,
         allParams: Object.fromEntries(urlParams.entries())
       });
 
@@ -104,9 +106,16 @@ const Checkout: React.FC = () => {
       if (
         (status === 'success' && invoiceId) ||
         (sipayStatus === '1' && invoiceId) ||
-        (status === 'success' && sipayStatus === '1' && invoiceId)
+        (status === 'success' && sipayStatus === '1' && invoiceId) ||
+        (hashBypass === '1' && sipayStatus === '1' && invoiceId)
       ) {
-        console.log('✅ 3D ödeme başarılı tespit edildi!', { status, sipayStatus, invoiceId, orderNo });
+        console.log('✅ 3D ödeme başarılı tespit edildi!', { 
+          status, 
+          sipayStatus, 
+          invoiceId, 
+          orderNo,
+          hashBypass: hashBypass === '1' ? 'Hash validation bypassed' : 'Normal validation'
+        });
         
         // localStorage'dan form verilerini oku
         const savedData = localStorage.getItem('checkout_form_data');
@@ -1171,6 +1180,55 @@ const Checkout: React.FC = () => {
                             </p>
                           </div>
                         )}
+                        
+                        {/* Gerçek Kart Test Bilgilendirmesi */}
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm text-blue-700 font-medium">� Gerçek Kart Test Modu:</p>
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCardData({
+                                    cardNumber: '4508 0345 0803 4509',
+                                    cardHolder: 'TEST USER',
+                                    expiryMonth: '12',
+                                    expiryYear: '26',
+                                    cvv: '000',
+                                    installments: 1
+                                  });
+                                }}
+                                className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 px-2 py-1 rounded"
+                              >
+                                Test Kartı
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCardData({
+                                    cardNumber: '',
+                                    cardHolder: '',
+                                    expiryMonth: '',
+                                    expiryYear: '',
+                                    cvv: '',
+                                    installments: 1
+                                  });
+                                }}
+                                className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded"
+                              >
+                                Temizle
+                              </button>
+                            </div>
+                          </div>
+                          <div className="text-xs text-red-600 space-y-1">
+                            <div>• 🚨 <strong>GERÇEK ÖDEME MODU - Kartınızdan para çekilecektir!</strong></div>
+                            <div>• 💳 Lütfen gerçek kart bilgilerinizi dikkatli girin</div>
+                            <div>• �️ 3D Secure doğrulaması aktif</div>
+                            <div>• � Sorun yaşarsanız müşteri hizmetleri ile iletişime geçin</div>
+                            <div>• � Tüm ödemeler SSL ile şifrelenir</div>
+                            <div className="text-xs text-red-700 mt-1 font-semibold">⚠️ Bu gerçek bir ödeme işlemidir!</div>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Kart Sahibi */}
@@ -1316,51 +1374,169 @@ const Checkout: React.FC = () => {
               )}
 
               {activeStep === 'onay' && orderData && (
-                <div className="space-y-6">
-                  <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Check className="h-8 w-8 text-green-600" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Ödemeniz Başarılı!</h3>
-                    <p className="text-gray-600 mb-4">
-                      Sipariş numaranız: <span className="font-medium">{orderData.orderNumber || orderData.orderId}</span>
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Sipariş detayları e-posta adresinize gönderildi.
-                    </p>
-                  </div>
-
-                  <div className="bg-white rounded-lg shadow-sm border p-6">
-                    <h4 className="font-semibold text-gray-900 mb-4">Sipariş Özeti</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Ürünler:</span>
-                        <span>{orderData.orderSummary.subtotal.toFixed(2)} ₺</span>
+                <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 py-12 px-4">
+                  <div className="max-w-4xl mx-auto">
+                    {/* Başarı Animasyonu */}
+                    <div className="text-center mb-12">
+                      <div className="relative inline-block">
+                        <div className="w-24 h-24 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg animate-pulse">
+                          <Check className="h-12 w-12 text-white animate-bounce" />
+                        </div>
+                        <div className="absolute -top-2 -right-2 w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center animate-spin">
+                          ✨
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Kargo:</span>
-                        <span>{orderData.orderSummary.shipping.toFixed(2)} ₺</span>
-                      </div>
-                      <div className="border-t pt-2 flex justify-between font-semibold">
-                        <span>Toplam:</span>
-                        <span>{orderData.orderSummary.total.toFixed(2)} ₺</span>
+                      
+                      <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+                        🎉 Siparişiniz <span className="text-green-600">Tamamlandı!</span>
+                      </h1>
+                      
+                      <p className="text-xl text-gray-600 mb-2">
+                        Ödemeniz başarıyla alındı ve siparişiniz hazırlanmaya başladı.
+                      </p>
+                      
+                      <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-4 py-2 rounded-full font-medium">
+                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                        Sipariş Numaranız: <span className="font-bold">{orderData.orderNumber || orderData.orderId}</span>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex gap-4">
-                    <Link 
-                      to="/" 
-                      className="flex-1 bg-gray-200 text-gray-700 py-3 px-6 rounded-lg font-medium hover:bg-gray-300 transition-colors text-center"
-                    >
-                      Ana Sayfaya Dön
-                    </Link>
-                    <Link 
-                      to="/profile" 
-                      className="flex-1 bg-orange-500 text-white py-3 px-6 rounded-lg font-medium hover:bg-orange-600 transition-colors text-center"
-                    >
-                      Siparişlerimi Görüntüle
-                    </Link>
+                    {/* Sipariş Detayları Kartı */}
+                    <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden mb-8">
+                      <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-8 py-6">
+                        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                            📦
+                          </div>
+                          Sipariş Detayları
+                        </h2>
+                      </div>
+                      
+                      <div className="p-8">
+                        {/* Sipariş Öğeleri */}
+                        <div className="mb-8">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            🛍️ Satın Aldığınız Ürünler
+                          </h3>
+                          <div className="space-y-4">
+                            {orderData.orderSummary.items.map((item: any, index: number) => (
+                              <div key={index} className="flex justify-between items-center bg-gray-50 rounded-xl p-4">
+                                <div className="flex items-center gap-4">
+                                  <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                                    🧽
+                                  </div>
+                                  <div>
+                                    <h4 className="font-medium text-gray-900">{item.name}</h4>
+                                    <p className="text-sm text-gray-500">Adet: {item.quantity}</p>
+                                  </div>
+                                </div>
+                                <span className="font-semibold text-gray-900">
+                                  {(item.price * item.quantity).toFixed(2)} ₺
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Ödeme Özeti */}
+                        <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            💳 Ödeme Özeti
+                          </h3>
+                          <div className="space-y-3">
+                            <div className="flex justify-between text-gray-700">
+                              <span>Ürünler Toplamı:</span>
+                              <span className="font-medium">{orderData.orderSummary.subtotal.toFixed(2)} ₺</span>
+                            </div>
+                            <div className="flex justify-between text-gray-700">
+                              <span>Kargo Ücreti:</span>
+                              <span className="font-medium">
+                                {orderData.orderSummary.shipping === 0 ? (
+                                  <span className="text-green-600 font-bold">🎉 ÜCRETSİZ</span>
+                                ) : (
+                                  `${orderData.orderSummary.shipping.toFixed(2)} ₺`
+                                )}
+                              </span>
+                            </div>
+                            <div className="border-t border-gray-300 pt-3 flex justify-between text-xl font-bold text-gray-900">
+                              <span>Toplam Tutar:</span>
+                              <span className="text-green-600">{orderData.orderSummary.total.toFixed(2)} ₺</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bilgilendirme Kartları */}
+                    <div className="grid md:grid-cols-2 gap-6 mb-8">
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            📧
+                          </div>
+                          <h3 className="font-semibold text-blue-900">E-posta Onayı</h3>
+                        </div>
+                        <p className="text-blue-700 text-sm">
+                          Sipariş detayları ve kargo takip bilgileri e-posta adresinize gönderildi.
+                        </p>
+                      </div>
+
+                      <div className="bg-purple-50 border border-purple-200 rounded-xl p-6">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                            🚚
+                          </div>
+                          <h3 className="font-semibold text-purple-900">Kargo Süreci</h3>
+                        </div>
+                        <p className="text-purple-700 text-sm">
+                          Siparişiniz 1-2 iş günü içinde kargoya verilecek ve size ulaştırılacaktır.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Aksiyon Butonları */}
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <Link 
+                        to="/" 
+                        className="flex-1 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 py-4 px-8 rounded-xl font-semibold hover:from-gray-200 hover:to-gray-300 transition-all duration-300 text-center flex items-center justify-center gap-2 transform hover:scale-105"
+                      >
+                        🏠 Ana Sayfaya Dön
+                      </Link>
+                      <Link 
+                        to="/contact" 
+                        className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-8 rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-300 text-center flex items-center justify-center gap-2 transform hover:scale-105"
+                      >
+                        📞 Bize Ulaşın
+                      </Link>
+                      <Link 
+                        to="/blogs" 
+                        className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 px-8 rounded-xl font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-300 text-center flex items-center justify-center gap-2 transform hover:scale-105"
+                      >
+                        📝 Blog'a Git
+                      </Link>
+                    </div>
+
+                    {/* Teşekkür Mesajı */}
+                    <div className="text-center mt-12 p-8 bg-white rounded-2xl shadow-lg border border-gray-100">
+                      <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                        💚 CalFormat Ailesine Hoş Geldiniz!
+                      </h3>
+                      <p className="text-gray-600 text-lg">
+                        Doğal ve sağlıklı beslenme yolculuğunuzda yanınızdayız. 
+                        Siparişiniz için teşekkür ederiz!
+                      </p>
+                    </div>
+
+                    {/* Hata Mesajı (varsa) */}
+                    {orderData.orderError && (
+                      <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+                        <div className="flex items-center gap-3 mb-2">
+                          <AlertCircle className="w-6 h-6 text-yellow-600" />
+                          <h3 className="font-semibold text-yellow-800">Önemli Bilgilendirme</h3>
+                        </div>
+                        <p className="text-yellow-700">{orderData.orderError}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
