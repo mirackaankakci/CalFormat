@@ -49,6 +49,7 @@ export interface OrderData {
 export interface OrderResult {
   success: boolean;
   orderId?: string;
+  orderNumber?: string; // İkas'tan dönen sipariş numarası
   message?: string;
   data?: any;
   orderSummary?: {
@@ -370,6 +371,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return {
           success: true,
           orderId: result.data?.id || `ORDER-${Date.now()}`,
+          orderNumber: result.data?.orderNumber || result.data?.number || `#${Date.now()}`, // İkas'tan dönen sipariş numarası
           message: 'Sipariş başarıyla oluşturuldu',
           data: result.data,
           orderSummary
@@ -389,6 +391,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return {
           success: true,
           orderId: `FALLBACK-${Date.now()}`,
+          orderNumber: `#FALLBACK-${Date.now()}`, // Fallback sipariş numarası
           message: result.message || 'Sipariş oluşturuldu (fallback)',
           data: result.fallback_data,
           orderSummary

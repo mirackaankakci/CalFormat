@@ -13,8 +13,6 @@ require_once __DIR__ . '/security_new.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
-header('Content-Type: application/json; charset=utf-8');
-
 try {
     // Konfigürasyonu yükle
     define('INTERNAL_ACCESS', true);
@@ -45,450 +43,113 @@ try {
                     $array = explode('|', $decryptedMsg);
                     $status = $array[0] ?? 0;
                     $total = $array[1] ?? 0;
-                    $invoiceId = $array[2] ?? '0';
-                    $orderId = $array[3] ?? 0;
-                    $currencyCode = $array[4] ?? '';
+                    $invoiceId = $array[2] ?? "";
+                    $orderId = $array[3] ?? "";
+                    $currencyCode = $array[4] ?? "TRY";
+
+                    return [
+                        'status' => (int)$status,
+                        'total' => (float)$total,
+                        'invoice_id' => $invoiceId,
+                        'order_id' => $orderId,
+                        'currency_code' => $currencyCode
+                    ];
                 }
             }
         }
 
-        return [$status, $total, $invoiceId, $orderId, $currencyCode];
+        return false;
     }
 
-    /**
-     * Kullanıcı dostu HTML dönüş sayfası göster
-     */
-    function displayReturnPage($result, $config) {
-        // Header'ı HTML'e çevir
-        header('Content-Type: text/html; charset=utf-8');
+    // Frontend URL belirleme - dinamik
+    $frontendUrl = 'http://localhost:5173'; // Varsayılan
+
+    // Canlı ortamda dinamik URL tespiti
+    if (isset($_SERVER['HTTP_HOST'])) {
+        $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'];
         
-        $isSuccessful = $result['payment_successful'];
-        $transactionData = $result['transaction_data'];
-        
-        // Frontend redirect URL'i hazırla
-        $frontendUrl = $config['frontend_url'] ?? 'http://localhost:5173';
-        
-        if ($isSuccessful) {
-            $redirectUrl = $frontendUrl . '/checkout?status=success&invoice_id=' . urlencode($transactionData['invoice_id']);
-            $statusClass = 'success';
-            $statusIcon = '✅';
-            $statusMessage = 'Ödeme Başarılı!';
-            $statusDescription = 'Ödemeniz başarıyla tamamlandı. Siparişiniz hazırlanmaya başlanacak.';
-            $bgColor = '#d4edda';
-            $borderColor = '#c3e6cb';
-            $textColor = '#155724';
+        // IP adresi kontrolü
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            $frontendUrl = $protocol . '://' . $host . ':5173';
         } else {
-            $redirectUrl = $frontendUrl . '/checkout?status=failed&invoice_id=' . urlencode($transactionData['invoice_id']);
-            $statusClass = 'error';
-            $statusIcon = '❌';
-            $statusMessage = 'Ödeme Başarısız!';
-            $statusDescription = 'Ödemeniz tamamlanamadı. Lütfen tekrar deneyin.';
-            $bgColor = '#f8d7da';
-            $borderColor = '#f5c6cb';
-            $textColor = '#721c24';
+            $frontendUrl = $protocol . '://' . $host;
         }
-        
-        echo '<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ödeme Sonucu - CalFormat</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        
-        .container {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            overflow: hidden;
-            max-width: 500px;
-            width: 100%;
-            text-align: center;
-            animation: slideIn 0.5s ease-out;
-        }
-        
-        @keyframes slideIn {
-            from {
-                transform: translateY(-20px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-        
-        .header {
-            background: ' . $bgColor . ';
-            border-bottom: 3px solid ' . $borderColor . ';
-            padding: 30px;
-            color: ' . $textColor . ';
-        }
-        
-        .status-icon {
-            font-size: 60px;
-            margin-bottom: 15px;
-        }
-        
-        .status-title {
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        
-        .status-description {
-            font-size: 16px;
-            line-height: 1.4;
-            opacity: 0.8;
-        }
-        
-        .content {
-            padding: 30px;
-        }
-        
-        .transaction-info {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 25px;
-            text-align: left;
-        }
-        
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            font-size: 14px;
-        }
-        
-        .info-label {
-            color: #6c757d;
-            font-weight: 500;
-        }
-        
-        .info-value {
-            color: #495057;
-            font-weight: 600;
-        }
-        
-        .countdown {
-            background: #e9ecef;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-            font-size: 16px;
-            color: #495057;
-        }
-        
-        .countdown-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #007bff;
-        }
-        
-        .btn-group {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-        }
-        
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            text-decoration: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .btn-primary {
-            background: #007bff;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #0056b3;
-            transform: translateY(-2px);
-        }
-        
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .btn-secondary:hover {
-            background: #545b62;
-            transform: translateY(-2px);
-        }
-        
-        .logo {
-            width: 120px;
-            height: auto;
-            margin-bottom: 20px;
-        }
-        
-        @media (max-width: 600px) {
-            .container {
-                margin: 10px;
-            }
-            
-            .header {
-                padding: 20px;
-            }
-            
-            .content {
-                padding: 20px;
-            }
-            
-            .btn-group {
-                flex-direction: column;
-            }
-            
-            .status-icon {
-                font-size: 48px;
-            }
-            
-            .status-title {
-                font-size: 20px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="status-icon">' . $statusIcon . '</div>
-            <div class="status-title">' . $statusMessage . '</div>
-            <div class="status-description">' . $statusDescription . '</div>
-        </div>
-        
-        <div class="content">
-            <div class="transaction-info">
-                <div class="info-row">
-                    <span class="info-label">Sipariş No:</span>
-                    <span class="info-value">' . htmlspecialchars($transactionData['order_no']) . '</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Fatura ID:</span>
-                    <span class="info-value">' . htmlspecialchars($transactionData['invoice_id']) . '</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Tutar:</span>
-                    <span class="info-value">' . number_format($transactionData['total'], 2) . ' ' . $transactionData['currency_code'] . '</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Ödeme Türü:</span>
-                    <span class="info-value">3D Güvenli Ödeme</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Tarih:</span>
-                    <span class="info-value">' . date('d.m.Y H:i') . '</span>
-                </div>
-            </div>
-            
-            <div class="countdown">
-                <div>Otomatik yönlendiriliyor...</div>
-                <div class="countdown-number" id="countdown">5</div>
-            </div>
-            
-            <div class="btn-group">
-                <a href="' . $redirectUrl . '" class="btn btn-primary">
-                    🏠 Ana Sayfaya Dön
-                </a>
-                <a href="' . $frontendUrl . '/contact" class="btn btn-secondary">
-                    📞 Destek
-                </a>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        let countdown = 5;
-        const countdownElement = document.getElementById("countdown");
-        
-        const timer = setInterval(() => {
-            countdown--;
-            countdownElement.textContent = countdown;
-            
-            if (countdown <= 0) {
-                clearInterval(timer);
-                window.location.href = "' . $redirectUrl . '";
-            }
-        }, 1000);
-        
-        // Hemen yönlendir butonu
-        document.addEventListener("keydown", function(event) {
-            if (event.key === "Enter" || event.key === " ") {
-                clearInterval(timer);
-                window.location.href = "' . $redirectUrl . '";
-            }
-        });
-    </script>
-</body>
-</html>';
     }
 
-    /**
-     * 3D Return işleyici
-     */
-    function handle3DReturn($postData, $config) {
-        // Gerekli parametreler var mı kontrol et
-        $requiredParams = ['sipay_status', 'invoice_id', 'hash_key'];
-        foreach ($requiredParams as $param) {
-            if (!isset($postData[$param])) {
-                throw new Exception("Eksik parametre: $param");
-            }
-        }
+    // POST verilerini al
+    $postData = $_POST;
+    
+    securityLog('3D Return request received', 'INFO', [
+        'post_data_keys' => array_keys($postData),
+        'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+    ]);
 
-        // Hash key doğrulaması
-        list($status, $total, $invoiceId, $orderId, $currencyCode) = validateHashKey(
-            $postData['hash_key'], 
-            $config['app_secret']
-        );
-        
-        // Ödeme durumu analizi
-        $isSuccessful = ($postData['sipay_status'] == '1' && ($status == '1' || $status === 1));
-        
-        $result = [
-            'success' => true,
-            'payment_type' => '3D_RETURN',
-            'payment_successful' => $isSuccessful,
-            'payment_status' => $postData['sipay_status'],
-            'hash_validated' => !empty($status),
-            'transaction_data' => [
-                'sipay_status' => $postData['sipay_status'],
-                'order_no' => $postData['order_no'] ?? $postData['order_id'] ?? '',
-                'invoice_id' => $postData['invoice_id'],
-                'total' => $total,
-                'currency_code' => $currencyCode,
-                'status_description' => $postData['status_description'] ?? '',
-                'transaction_type' => $postData['transaction_type'] ?? '',
-                'payment_method' => $postData['payment_method'] ?? '',
-                'md_status' => $postData['md_status'] ?? '',
-                'auth_code' => $postData['auth_code'] ?? ''
-            ],
-            'validation' => [
-                'hash_status' => $status,
-                'hash_total' => $total,
-                'hash_invoice_id' => $invoiceId,
-                'hash_order_id' => $orderId,
-                'hash_currency' => $currencyCode
-            ],
-            'timestamp' => date('Y-m-d H:i:s')
+    // Gerekli parametreler var mı kontrol et
+    $requiredParams = ['sipay_status', 'invoice_id', 'hash_key'];
+    foreach ($requiredParams as $param) {
+        if (!isset($postData[$param])) {
+            throw new Exception("Required parameter missing: $param");
+        }
+    }
+
+    $sipayStatus = $postData['sipay_status'];
+    $invoiceId = $postData['invoice_id'];
+    $hashKey = $postData['hash_key'];
+    $orderNo = $postData['order_no'] ?? $invoiceId;
+
+    // Hash key doğrulama
+    $validationResult = validateHashKey($hashKey, $sipayConfig['hash_key']);
+    
+    if ($validationResult !== false) {
+        $transactionData = [
+            'status' => $validationResult['status'],
+            'total' => $validationResult['total'],
+            'invoice_id' => $validationResult['invoice_id'],
+            'order_no' => $orderNo,
+            'currency_code' => $validationResult['currency_code'] ?? 'TRY'
         ];
 
-        // Başarı durumuna göre ekstra bilgiler
+        $isSuccessful = ($sipayStatus == '1' && $validationResult['status'] == 1);
+
         if ($isSuccessful) {
-            $result['message'] = 'Ödeme başarıyla tamamlandı';
-            $result['next_action'] = 'redirect_success';
+            $redirectUrl = $frontendUrl . '/checkout?status=success&sipay_status=1&invoice_id=' . urlencode($transactionData['invoice_id']) . '&order_no=' . urlencode($transactionData['order_no']);
         } else {
-            $result['message'] = 'Ödeme başarısız oldu';
-            $result['next_action'] = 'redirect_cancel';
-            $result['error_details'] = [
-                'status_description' => $postData['status_description'] ?? 'Bilinmeyen hata',
-                'error_code' => $postData['error_code'] ?? '',
-                'original_bank_error' => $postData['original_bank_error_description'] ?? ''
-            ];
+            $redirectUrl = $frontendUrl . '/checkout?status=failed&sipay_status=0&invoice_id=' . urlencode($transactionData['invoice_id']) . '&order_no=' . urlencode($transactionData['order_no']);
         }
-
-        return $result;
-    }
-
-    // İstek işleme
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // POST verilerini güvenli şekilde al
-        $postData = sanitizeInput($_POST);
         
-        if (empty($postData)) {
-            $jsonData = getSecureJSONInput();
-            if ($jsonData) {
-                $postData = $jsonData;
-            }
-        }
-
-        if (empty($postData)) {
-            throw new Exception('3D Return verisi bulunamadı');
-        }
-
-        // URL'den gelen parametreleri de kontrol et
-        $urlParams = sanitizeInput($_GET);
-        $postData = array_merge($urlParams, $postData);
-
-        securityLog('3D Return POST request', 'INFO', [
-            'sipay_status' => $postData['sipay_status'] ?? '',
-            'invoice_id' => $postData['invoice_id'] ?? ''
+        // Direkt yönlendirme - ara ekran yok
+        header('Location: ' . $redirectUrl);
+        exit();
+    } else {
+        // Hash key doğrulama başarısız
+        securityLog('Hash key validation failed', 'ERROR', [
+            'provided_hash' => $hashKey ?? 'missing',
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
         ]);
-
-        $result = handle3DReturn($postData, $sipayConfig);
         
-        // JSON response istenip istenmediğini kontrol et
-        $isJsonRequest = (
-            isset($postData['format']) && $postData['format'] === 'json' ||
-            isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false ||
-            isset($_SERVER['HTTP_USER_AGENT']) && strpos($_SERVER['HTTP_USER_AGENT'], 'curl') !== false ||
-            isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest'
-        );
-        
-        if ($isJsonRequest) {
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode($result);
-        } else {
-            // 3D ödeme sonrası kullanıcı dostu HTML sayfası göster
-            displayReturnPage($result, $config);
-        }
-
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        // URL parametrelerinden 3D return verilerini işle
-        $getParams = sanitizeInput($_GET);
-        
-        if (empty($getParams)) {
-            // API bilgisi döndür
-            echo json_encode([
-                'success' => true,
-                'service' => 'SiPay 3D Return Handler',
-                'description' => '3D güvenli ödeme sonrası geri dönüş işleyicisi',
-                'supported_methods' => ['GET', 'POST'],
-                'required_params' => ['sipay_status', 'invoice_id', 'hash_key'],
-                'timestamp' => date('Y-m-d H:i:s')
-            ]);
-        } else {
-            $result = handle3DReturn($getParams, $sipayConfig);
-            
-            // GET request için de aynı güzel HTML sayfasını göster
-            displayReturnPage($result, $config);
-        }
+        $redirectUrl = $frontendUrl . '/checkout?status=failed&error=validation_failed';
+        header('Location: ' . $redirectUrl);
+        exit();
     }
 
 } catch (Exception $e) {
     error_log('3D Return Error: ' . $e->getMessage());
     
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'error' => $e->getMessage(),
-        'error_code' => '3D_RETURN_ERROR',
-        'payment_type' => '3D_RETURN',
-        'timestamp' => date('Y-m-d H:i:s')
-    ]);
+    // Hata durumunda da yönlendirme yap
+    $frontendUrl = 'http://localhost:5173';
+    if (isset($_SERVER['HTTP_HOST'])) {
+        $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'];
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            $frontendUrl = $protocol . '://' . $host . ':5173';
+        } else {
+            $frontendUrl = $protocol . '://' . $host;
+        }
+    }
+    
+    $redirectUrl = $frontendUrl . '/checkout?status=failed&error=system_error';
+    header('Location: ' . $redirectUrl);
+    exit();
 }
 ?>

@@ -113,8 +113,9 @@ const Checkout: React.FC = () => {
         if (savedData) {
           console.log('💾 3D ödeme sonrası localStorage\'dan veri okunuyor...');
           
+          let parsedData: any;
           try {
-            const parsedData = JSON.parse(savedData);
+            parsedData = JSON.parse(savedData);
             console.log('📋 localStorage\'dan okunan veri:', parsedData);
             
             const { 
@@ -224,6 +225,7 @@ const Checkout: React.FC = () => {
             setOrderData({
               success: true,
               orderId: orderResult.orderId || orderNo || invoiceId || savedInvoiceId,
+              orderNumber: orderResult.orderNumber || `#${orderNo || invoiceId || savedInvoiceId}`,
               invoiceId: invoiceId || savedInvoiceId,
               orderSummary: {
                 items: savedCartItems || items,
@@ -251,6 +253,7 @@ const Checkout: React.FC = () => {
             setOrderData({
               success: true,
               orderId: orderNo || invoiceId || savedInvoiceId,
+              orderNumber: `#${orderNo || invoiceId || savedInvoiceId}`,
               invoiceId: invoiceId || savedInvoiceId,
               orderSummary: {
                 items: savedCartItems || items,
@@ -271,6 +274,7 @@ const Checkout: React.FC = () => {
           setOrderData({
             success: true,
             orderId: orderNo || invoiceId,
+            orderNumber: `#${orderNo || invoiceId}`,
             invoiceId: invoiceId,
             orderSummary: {
               items: items,
@@ -513,32 +517,15 @@ const Checkout: React.FC = () => {
       if (isPaymentSuccess) {
         // 3D ödeme için HTML response check
         if (paymentData.payment_type === '3D' && result.data.form_html) {
-          // 3D ödeme için yeni pencerede form açma
-          const newWindow = window.open('', '_blank', 'width=600,height=700');
-          if (newWindow) {
-            newWindow.document.write(result.data.form_html);
-            newWindow.document.close();
-            
-            // 3D ödeme bekleme ekranı
-            setOrderError(null);
-            setIsProcessingPayment(false);
-            
-            console.log('🔄 3D ödeme penceresi açıldı. Kullanıcı 3D güvenlik doğrulamasını tamamlamalı.');
-            
-            // 3D ödeme sonucunu bekle
-            const checkInterval = setInterval(() => {
-              if (newWindow.closed) {
-                clearInterval(checkInterval);
-                console.log('🔄 3D ödeme penceresi kapatıldı. Sayfa yenileniyor...');
-                // Sayfa yenilenmesini bekle
-                window.location.reload();
-              }
-            }, 1000);
-            
-            return;
-          } else {
-            throw new Error('3D ödeme penceresi açılamadı. Lütfen popup engelleyicisini devre dışı bırakın.');
-          }
+          console.log('🔄 3D ödeme formu submit ediliyor...');
+          
+          // Sayfayı temizle ve direkt HTML'i yaz
+          document.open();
+          document.write(result.data.form_html);
+          document.close();
+          
+          // İşlem tamamlandı, return'den geleni bekle
+          return;
         }
         
         // 2D ödeme başarılı veya 3D ödeme tamamlandı
@@ -624,6 +611,7 @@ const Checkout: React.FC = () => {
           setOrderData({
             success: true,
             orderId: orderResult.orderId || invoiceId,
+            orderNumber: orderResult.orderNumber || `#${invoiceId}`,
             invoiceId: invoiceId,
             transactionType: paymentData.payment_type || '2D',
             orderSummary: {
@@ -642,6 +630,7 @@ const Checkout: React.FC = () => {
           setOrderData({
             success: true,
             orderId: invoiceId,
+            orderNumber: `#${invoiceId}`,
             invoiceId: invoiceId,
             transactionType: paymentData.payment_type || '2D',
             orderSummary: {
@@ -1334,7 +1323,7 @@ const Checkout: React.FC = () => {
                     </div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">Ödemeniz Başarılı!</h3>
                     <p className="text-gray-600 mb-4">
-                      Sipariş numaranız: <span className="font-medium">{orderData.orderId}</span>
+                      Sipariş numaranız: <span className="font-medium">{orderData.orderNumber || orderData.orderId}</span>
                     </p>
                     <p className="text-sm text-gray-500">
                       Sipariş detayları e-posta adresinize gönderildi.
