@@ -40,6 +40,208 @@ try {
     $sipayConfig['check_status_url'] = $sipayConfig['base_url'] . $sipayConfig['check_status_url'];
 
     /**
+     * İkas Sipariş Oluşturma Fonksiyonu - 2D ve 3D Ödeme Sonrası
+     */
+    function createIkasOrderFromPayment($orderData, $config) {
+        securityLog('Creating Ikas order from payment success - FULL ORDER DATA', 'INFO', [
+            'invoice_id' => $orderData['invoice_id'] ?? 'unknown',
+            'total' => $orderData['total'] ?? 0,
+            'payment_type' => $orderData['payment_type'] ?? 'unknown',
+            'full_order_data' => $orderData // TÜM VERİLERİ LOGLA
+        ]);
+        
+        try {
+            $ikasConfig = $config['ikas'];
+            
+            // Token al
+            $tokenData = [
+                'grant_type' => 'client_credentials',
+                'client_id' => $ikasConfig['client_id'],
+                'client_secret' => $ikasConfig['client_secret']
+            ];
+            
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $ikasConfig['token_url']);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($tokenData));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/x-www-form-urlencoded',
+                'Accept: application/json'
+            ]);
+            
+            $tokenResponse = curl_exec($ch);
+            $tokenHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($tokenHttpCode !== 200) {
+                throw new Exception('İkas token alınamadı: HTTP ' . $tokenHttpCode);
+            }
+            
+            $tokenResult = json_decode($tokenResponse, true);
+            $accessToken = $tokenResult['access_token'] ?? null;
+            
+            if (!$accessToken) {
+                throw new Exception('İkas access token bulunamadı');
+            }
+            
+            // Sipariş oluştur
+            $mutation = 'mutation CreateOrderWithTransactions($input: CreateOrderWithTransactionsInput!) {
+                createOrderWithTransactions(input: $input) {
+                    id
+                    orderNumber
+                }
+            }';
+            
+            // Ödeme verilerinden sipariş payload'ı oluştur
+            $orderPayload = [
+                'query' => $mutation,
+                'variables' => [
+                    'input' => [
+                        'order' => [
+                            'orderLineItems' => [
+                                [
+                                    'id' => $ikasConfig['defaults']['fallback_product_id'],
+                                    'price' => intval($orderData['total'] ?? 100),
+                                    'variant' => [
+                                        'id' => $ikasConfig['defaults']['fallback_variant_id']
+                                    ],
+                                    'quantity' => 1
+                                ]
+                            ],
+                            'billingAddress' => [
+                                'firstName' => $orderData['name'] ?? 'Ödeme',
+                                'lastName' => $orderData['surname'] ?? 'Müşterisi', 
+                                'addressLine1' => $orderData['bill_address1'] ?? 'Sipariş Adresi',
+                                'addressLine2' => $orderData['bill_address2'] ?? '',
+                                'city' => [
+                                    'id' => $ikasConfig['defaults']['default_city_id'],
+                                    'name' => $orderData['bill_city'] ?? $ikasConfig['defaults']['default_city']
+                                ],
+                                'country' => [
+                                    'id' => 'da8c5f2a-8d37-48a8-beff-6ab3793a1861',
+                                    'name' => 'Türkiye'
+                                ],
+                                'district' => [
+                                    'id' => $ikasConfig['defaults']['default_district_id'],
+                                    'name' => $orderData['bill_state'] ?? $ikasConfig['defaults']['default_district']
+                                ],
+                                'state' => [
+                                    'id' => 'da8c5f2a-8d37-48a8-beff-6ab3793a1861'
+                                ],
+                                'phone' => $orderData['bill_phone'] ?? '05551234567',
+                                'company' => null,
+                                'isDefault' => false
+                            ],
+                            'shippingAddress' => [
+                                'firstName' => $orderData['name'] ?? 'Ödeme',
+                                'lastName' => $orderData['surname'] ?? 'Müşterisi',
+                                'addressLine1' => $orderData['bill_address1'] ?? 'Sipariş Adresi',
+                                'addressLine2' => $orderData['bill_address2'] ?? '',
+                                'city' => [
+                                    'id' => $ikasConfig['defaults']['default_city_id'],
+                                    'name' => $orderData['bill_city'] ?? $ikasConfig['defaults']['default_city']
+                                ],
+                                'country' => [
+                                    'id' => 'da8c5f2a-8d37-48a8-beff-6ab3793a1861',
+                                    'name' => 'Türkiye'
+                                ],
+                                'district' => [
+                                    'id' => $ikasConfig['defaults']['default_district_id'],
+                                    'name' => $orderData['bill_state'] ?? $ikasConfig['defaults']['default_district']
+                                ],
+                                'state' => [
+                                    'id' => 'da8c5f2a-8d37-48a8-beff-6ab3793a1861'
+                                ],
+                                'phone' => $orderData['bill_phone'] ?? '05551234567',
+                                'company' => null,
+                                'isDefault' => false
+                            ],
+                            'note' => 'Başarılı ' . ($orderData['payment_type'] ?? 'ÖDEME') . ' sonrası oluşturulan sipariş - ' . ($orderData['invoice_id'] ?? date('Y-m-d H:i:s')),
+                            'deleted' => false,
+                            'customer' => [
+                                'lastName' => $orderData['surname'] ?? 'Müşterisi',
+                                'firstName' => $orderData['name'] ?? 'Ödeme',
+                                'email' => $orderData['bill_email'] ?? 'musteri@calformat.com.tr'
+                            ]
+                        ],
+                        'transactions' => [
+                            [
+                                'amount' => intval($orderData['total'] ?? 100)
+                            ]
+                        ]
+                    ]
+                ]
+            ];
+            
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $ikasConfig['graphql_url']);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($orderPayload));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer $accessToken",
+                "Content-Type: application/json",
+                "Accept: application/json"
+            ]);
+            
+            $orderResponse = curl_exec($ch);
+            $orderHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            securityLog('Ikas order creation response from payment', 'INFO', [
+                'http_code' => $orderHttpCode,
+                'response_length' => strlen($orderResponse),
+                'response_preview' => substr($orderResponse, 0, 200)
+            ]);
+            
+            $orderResult = json_decode($orderResponse, true);
+            
+            if (isset($orderResult['data']['createOrderWithTransactions'])) {
+                securityLog('Ikas order created successfully from payment', 'SUCCESS', [
+                    'order_id' => $orderResult['data']['createOrderWithTransactions']['id'],
+                    'order_number' => $orderResult['data']['createOrderWithTransactions']['orderNumber'],
+                    'payment_type' => $orderData['payment_type'] ?? 'unknown'
+                ]);
+                
+                return [
+                    'success' => true,
+                    'order_id' => $orderResult['data']['createOrderWithTransactions']['id'],
+                    'order_number' => $orderResult['data']['createOrderWithTransactions']['orderNumber']
+                ];
+            } else {
+                securityLog('Ikas order creation failed from payment', 'ERROR', [
+                    'response' => $orderResult,
+                    'errors' => $orderResult['errors'] ?? 'no errors field'
+                ]);
+                
+                return [
+                    'success' => false,
+                    'error' => 'İkas sipariş oluşturulamadı',
+                    'details' => $orderResult['errors'] ?? []
+                ];
+            }
+            
+        } catch (Exception $e) {
+            securityLog('Exception in Ikas order creation from payment', 'ERROR', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return [
+                'success' => false,
+                'error' => 'Sipariş oluşturma hatası: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
      * SiPay Token Alma - En Basit, Filtresiz Yöntem
      */
     function getSipayToken($config) {
@@ -323,6 +525,39 @@ try {
 
         // 3D ödeme için IP ekle
         $paymentData['ip'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        
+        // 3D ödeme için müşteri bilgilerini session'da sakla
+        if (!session_id()) {
+            session_start();
+        }
+        
+        $sessionData = [
+            'name' => $paymentData['name'] ?? '',
+            'surname' => $paymentData['surname'] ?? '',
+            'bill_email' => $paymentData['bill_email'] ?? '',
+            'bill_phone' => $paymentData['bill_phone'] ?? '',
+            'bill_address1' => $paymentData['bill_address1'] ?? '',
+            'bill_address2' => $paymentData['bill_address2'] ?? '',
+            'bill_city' => $paymentData['bill_city'] ?? '',
+            'bill_state' => $paymentData['bill_state'] ?? '',
+            'bill_country' => $paymentData['bill_country'] ?? '',
+            'total' => $paymentData['total']
+        ];
+        
+        $_SESSION['payment_' . $paymentData['invoice_id']] = $sessionData;
+        
+        securityLog('Customer data stored in session for 3D payment', 'INFO', [
+            'invoice_id' => $paymentData['invoice_id'],
+            'session_key' => 'payment_' . $paymentData['invoice_id'],
+            'stored_data' => $sessionData,
+            'input_data' => [
+                'name' => $paymentData['name'] ?? 'MISSING',
+                'surname' => $paymentData['surname'] ?? 'MISSING',
+                'bill_email' => $paymentData['bill_email'] ?? 'MISSING',
+                'bill_phone' => $paymentData['bill_phone'] ?? 'MISSING',
+                'bill_address1' => $paymentData['bill_address1'] ?? 'MISSING'
+            ]
+        ]);
 
         // Debug: 3D ödeme verilerini logla
         securityLog('3D Payment data prepared', 'INFO', [
@@ -963,6 +1198,42 @@ try {
             );
             
             $result = process2DPayment($paymentData, $tokenData['token'], $sipayConfig);
+            
+            // 2D ödeme başarılıysa İkas'ta sipariş oluştur
+            if ($result['success'] && $paymentType === '2D') {
+                try {
+                    // Payment verilerini sipariş için hazırla
+                    $orderDataForIkas = array_merge($paymentData, [
+                        'payment_type' => '2D'
+                    ]);
+                    
+                    securityLog('2D Payment success - Order data being sent to Ikas', 'INFO', [
+                        'invoice_id' => $paymentData['invoice_id'],
+                        'full_payment_data' => $paymentData,
+                        'order_data_for_ikas' => $orderDataForIkas
+                    ]);
+                    
+                    $orderCreateResult = createIkasOrderFromPayment($orderDataForIkas, $config);
+                    securityLog('2D Payment successful - Ikas order creation attempted', 'INFO', [
+                        'invoice_id' => $paymentData['invoice_id'],
+                        'order_creation_success' => $orderCreateResult['success'] ?? false,
+                        'order_id' => $orderCreateResult['order_id'] ?? null
+                    ]);
+                    
+                    // Sipariş oluşturma sonucunu result'a ekle
+                    $result['order_creation'] = $orderCreateResult;
+                } catch (Exception $e) {
+                    securityLog('2D Payment successful but Ikas order creation failed', 'ERROR', [
+                        'invoice_id' => $paymentData['invoice_id'],
+                        'error' => $e->getMessage()
+                    ]);
+                    
+                    $result['order_creation'] = [
+                        'success' => false,
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
         }
 
         // Sonucu döndür

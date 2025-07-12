@@ -167,7 +167,11 @@ try {
         ]
     ];
 
-    securityLog('GraphQL order payload prepared', 'INFO');
+    securityLog('GraphQL order payload prepared', 'INFO', [
+        'has_input' => isset($input['input']),
+        'variables_structure' => array_keys($orderData['variables']),
+        'input_structure' => isset($input['input']) ? array_keys($input['input']) : 'no input key'
+    ]);
 
     // cURL ile sipariş oluştur
     $ch = curl_init();
@@ -198,16 +202,28 @@ try {
         throw new Exception('Sipariş oluşturulamadı - API çağrısı başarısız: ' . $orderError);
     }
 
-    securityLog('Order API response received', 'INFO', ['http_code' => $orderHttpCode]);
+    securityLog('Order API response received', 'INFO', [
+        'http_code' => $orderHttpCode,
+        'response_length' => strlen($orderResponse),
+        'response_preview' => substr($orderResponse, 0, 200) . '...'
+    ]);
 
     $orderResult = json_decode($orderResponse, true);
     
     if (json_last_error() !== JSON_ERROR_NONE) {
-        securityLog('Order API response JSON decode error', 'ERROR', ['error' => json_last_error_msg()]);
+        securityLog('Order API response JSON decode error', 'ERROR', [
+            'error' => json_last_error_msg(),
+            'raw_response' => $orderResponse
+        ]);
         throw new Exception('API yanıtı geçersiz JSON: ' . json_last_error_msg());
     }
 
-    securityLog('Order creation response parsed', 'INFO', ['http_code' => $orderHttpCode]);
+    securityLog('Order creation response parsed', 'INFO', [
+        'http_code' => $orderHttpCode,
+        'has_data' => isset($orderResult['data']),
+        'has_errors' => isset($orderResult['errors']),
+        'structure' => array_keys($orderResult)
+    ]);
 
     // GraphQL hataları kontrol et
     if (isset($orderResult['errors']) && !empty($orderResult['errors'])) {
