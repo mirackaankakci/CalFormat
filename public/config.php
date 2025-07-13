@@ -73,12 +73,10 @@ return [
         'payment_methods' => ['2D', '3D'],
         'max_installments' => 12,
         
-        // Hash Key - Otomatik oluşturulur, manuel değer gerekmez
-        // 'hash_key' => getenv('SIPAY_HASH_KEY') ?: 'AUTO_GENERATED', // Hash key otomatik oluşturulur
-        
         // Webhook URL'leri - PRODUCTION
-        'webhook_url' => getenv('SIPAY_WEBHOOK_URL') ?: 'https://calformat.com.tr/sipay_webhook.php',
-        'return_url' => getenv('SIPAY_RETURN_URL') ?: 'https://calformat.com.tr/sipay_3d_return.php',
+        'webhook_url' => getenv('SIPAY_WEBHOOK_URL') ?: 'https://calformat.com/sipay_webhook.php',
+        'return_url' => getenv('SIPAY_RETURN_URL') ?: 'https://calformat.com/sipay_3d_return.php',
+        'cancel_url' => getenv('SIPAY_CANCEL_URL') ?: 'https://calformat.com/sipay_3d_return.php?status=cancel',
         
         // Test kartları (sadece test modunda kullanılır) - SiPay resmi test kartları
         'test_cards' => [
@@ -99,11 +97,11 @@ return [
     ],
     
     // Frontend URL - PRODUCTION
-    'frontend_url' => getenv('FRONTEND_URL') ?: 'https://calformat.com.tr',
+    'frontend_url' => getenv('FRONTEND_URL') ?: 'https://calformat.com',
     
     // Güvenlik Ayarları
     'security' => [
-        'allowed_origins' => explode(',', getenv('ALLOWED_ORIGINS') ?: 'https://calformat.com.tr,https://www.calformat.com.tr'),
+        'allowed_origins' => explode(',', getenv('ALLOWED_ORIGINS') ?: 'https://calformat.com,https://www.calformat.com'),
         'hash_algorithm' => 'sha256',
         'encryption_key' => getenv('ENCRYPTION_KEY') ?: 'CalFormat2024!@#$',
         'rate_limit' => [

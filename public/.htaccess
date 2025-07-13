@@ -12,7 +12,7 @@ Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
 Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; connect-src 'self' https:; form-action 'self' https:; frame-src 'self' https:; object-src 'none';"
 
 # CORS ayarları (Production - Daha kısıtlı)
-Header always set Access-Control-Allow-Origin "https://calformat.com.tr"
+Header always set Access-Control-Allow-Origin "https://calformat.com"
 Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
 Header always set Access-Control-Allow-Headers "Origin, Content-Type, Accept, Authorization, X-Request-With"
 Header always set Access-Control-Allow-Credentials "true"

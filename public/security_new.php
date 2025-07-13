@@ -82,8 +82,8 @@ function setCORSHeaders(): void {
     $allowedOrigins = [
         'http://localhost:5173',
         'http://localhost:3000',
-        'https://calformat.com.tr',
-        'https://www.calformat.com.tr'
+        'https://calformat.com',
+        'https://www.calformat.com'
     ];
     
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';

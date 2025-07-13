@@ -298,8 +298,14 @@ class SiPayService {
         paymentData.return_url = `${window.location.origin}/sipay_3d_return.php`;
       }
 
+      // Backend'e gönderilecek veriyi hazırla - action parametresini ekle
+      const requestData = {
+        action: paymentData.payment_type === '3D' ? 'start_3d_payment' : 'start_2d_payment',
+        ...paymentData
+      };
+
       console.log('📤 SiPay\'a gönderilen veri:', {
-        ...paymentData,
+        ...requestData,
         cc_no: '****' + paymentData.cc_no.slice(-4), // Güvenlik için sadece son 4 hane
         cvv: '***' // CVV'yi gizle
       });
@@ -310,7 +316,7 @@ class SiPayService {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(paymentData)
+        body: JSON.stringify(requestData)
       });
 
       console.log('📥 SiPay yanıt durumu:', {
@@ -319,52 +325,47 @@ class SiPayService {
         headers: Object.fromEntries(response.headers.entries())
       });
 
-      // 3D ödeme için HTML response kontrolü
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('text/html')) {
-        // 3D ödeme HTML formu - yeni tab'da aç
-        const htmlContent = await response.text();
-        console.log('🌐 3D ödeme HTML formu alındı, yeni tab açılıyor...');
+      // JSON response (2D ödeme veya 3D form)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Backend'den 3D form HTML'i geldi mi kontrol et
+      if (data.success && data.redirect_form) {
+        console.log('🌐 3D ödeme HTML formu alındı (JSON response), yeni tab açılıyor...');
         
         const newWindow = window.open('', '_blank');
         if (newWindow) {
-          newWindow.document.write(htmlContent);
+          newWindow.document.write(data.redirect_form);
           newWindow.document.close();
         }
         
         return {
           success: true,
           payment_type: '3D',
-          invoice_id: paymentData.invoice_id,
+          invoice_id: data.invoice_id || paymentData.invoice_id,
+          message: data.message || '3D ödeme başlatıldı',
           timestamp: new Date().toISOString()
         };
       }
 
-      // JSON response (2D ödeme)
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ SiPay HTTP hatası:', {
-          status: response.status,
-          statusText: response.statusText,
-          responseText: errorText
-        });
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
-      }
-
-      const result: SiPayResponse = await response.json();
+      console.log('📥 SiPay yanıt verisi:', data);
       
-      console.log('✅ SiPay ödeme yanıtı:', result);
+      console.log('✅ SiPay ödeme yanıtı:', data);
       
       // Başarısızlık durumunu kontrol et
-      if (!result.success) {
+      if (!data.success) {
         console.error('💳 SiPay ödeme başarısız:', {
-          message: result.message,
-          error_code: result.error_code,
-          result: result
+          message: data.message,
+          error_code: data.error_code,
+          result: data
         });
       }
       
-      return result;
+      return data;
 
     } catch (error) {
       console.error('❌ SiPay ödeme hatası:', error);

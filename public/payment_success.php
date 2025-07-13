@@ -256,7 +256,7 @@ $isSuccess = ($status === 'success' && $sipayStatus === '1') || $sipayStatus ===
 
         <div class="buttons">
             <?php if ($isSuccess): ?>
-                <a href="mailto:info@calformat.com.tr?subject=Sipariş Hakkında - <?php echo htmlspecialchars($invoiceId); ?>" class="btn btn-secondary">
+                <a href="mailto:info@calformat.com?subject=Sipariş Hakkında - <?php echo htmlspecialchars($invoiceId); ?>" class="btn btn-secondary">
                     📧 İletişim
                 </a>
                 <a href="/" class="btn btn-primary">

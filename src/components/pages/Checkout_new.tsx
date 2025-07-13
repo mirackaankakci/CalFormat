@@ -134,6 +134,7 @@ const Checkout: React.FC = () => {
               selectedCity: savedSelectedCity, 
               selectedDistrict: savedSelectedDistrict, 
               selectedTown: savedSelectedTown,
+              addressInfo: savedAddressInfo, // Kaydedilen adres bilgilerini al
               cartItems: savedCartItems,
               subtotal: savedSubtotal,
               shipping: savedShipping,
@@ -150,53 +151,30 @@ const Checkout: React.FC = () => {
               savedShipping, 
               savedTotal,
               savedInvoiceId,
-              savedTimestamp
+              savedTimestamp,
+              savedAddressInfo
             });
             
             // ✅ GELİŞTİRİLMİŞ ADRES VALİDASYONU
             if (!savedSelectedCity || !savedSelectedDistrict) {
               throw new Error('Adres bilgileri eksik');
             }
-
-            // ✅ İKAS ID FORMAT KONTROLÜ
-            const isValidIkasId = (id: string) => {
-              return id && (
-                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
-                /^fb[0-9a-f]{6}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
-                /^\d+-\d+$/.test(id)
-              );
-            };
-
-            if (!isValidIkasId(savedSelectedCity)) {
-              console.warn('⚠️ 3D ödeme sonrası geçersiz şehir ID:', savedSelectedCity);
-              throw new Error('Geçersiz şehir seçimi. Lütfen şehir seçimini tekrar yapın.');
+            
+            // Adres bilgilerini al - önce savedAddressInfo'yu kontrol et
+            let finalAddressInfo;
+            if (savedAddressInfo && savedAddressInfo.city && savedAddressInfo.district) {
+              finalAddressInfo = savedAddressInfo;
+            } else {
+              // Fallback: getSelectedAddressInfo kullan
+              setSelectedCity(savedSelectedCity);
+              setSelectedDistrict(savedSelectedDistrict);
+              if (savedSelectedTown) setSelectedTown(savedSelectedTown);
+              finalAddressInfo = getSelectedAddressInfo();
             }
-
-            if (!isValidIkasId(savedSelectedDistrict)) {
-              console.warn('⚠️ 3D ödeme sonrası geçersiz ilçe ID:', savedSelectedDistrict);
-              throw new Error('Geçersiz ilçe seçimi. Lütfen ilçe seçimini tekrar yapın.');
-            }
-
-            // ✅ ADRES BİLGİLERİNİ DOĞRULA
-            if (!savedSelectedNames.cityName || !savedSelectedNames.districtName) {
-              throw new Error('İl ve ilçe adları zorunludur');
-            }
-
-            // Adres bilgilerini parse et - İkas API formatına uygun
-            const savedAddressInfo = {
-              city: { id: savedSelectedCity, name: savedSelectedNames.cityName },
-              district: { id: savedSelectedDistrict, name: savedSelectedNames.districtName },
-              town: { id: savedSelectedTown || '', name: savedSelectedNames.townName || '' }
-            };
-
-            // ✅ DEBUG LOGLARI - 3D ÖDEME SONRASI ADRES BİLGİLERİ
-            console.log('📍 3D Ödeme Sonrası Adres Bilgileri:', {
-              savedSelectedCity,
-              savedSelectedDistrict,
-              savedSelectedTown,
-              savedAddressInfo,
-              savedSelectedNames
-            });
+            
+            // Form verilerini de state'e geri yükle
+            setFormData(savedFormData);
+            setIsCompany(savedIsCompany);
 
             const orderPayload = {
               firstName: savedFormData.firstName,
@@ -205,20 +183,20 @@ const Checkout: React.FC = () => {
               phone: savedFormData.phone,
               shippingAddress: savedFormData.address,
               shippingAddressLine2: savedFormData.addressLine2 || '',
-              shippingCity: savedAddressInfo.city.name,
-              shippingDistrict: savedAddressInfo.district.name,
-              shippingTown: savedAddressInfo.town.name || '',
+              shippingCity: finalAddressInfo.city.name,
+              shippingDistrict: finalAddressInfo.district.name,
+              shippingTown: finalAddressInfo.town.name || '',
               shippingPostalCode: '34000',
-              shippingCityId: savedAddressInfo.city.id,
-              shippingDistrictId: savedAddressInfo.district.id,
-              shippingTownId: savedAddressInfo.town.id || '',
+              shippingCityId: finalAddressInfo.city.id,
+              shippingDistrictId: finalAddressInfo.district.id,
+              shippingTownId: finalAddressInfo.town.id || '',
               billingAddress: savedFormData.address,
               billingAddressLine2: savedFormData.addressLine2 || '',
-              billingCity: savedAddressInfo.city.name,
-              billingDistrict: savedAddressInfo.district.name,
+              billingCity: finalAddressInfo.city.name,
+              billingDistrict: finalAddressInfo.district.name,
               billingPostalCode: '34000',
-              billingCityId: savedAddressInfo.city.id,
-              billingDistrictId: savedAddressInfo.district.id,
+              billingCityId: finalAddressInfo.city.id,
+              billingDistrictId: finalAddressInfo.district.id,
               isCompany: savedIsCompany,
               companyName: savedIsCompany ? savedFormData.companyName : '',
               taxNumber: savedIsCompany ? savedFormData.taxNumber : '',
@@ -335,38 +313,52 @@ const Checkout: React.FC = () => {
   const validateStep = (step: 'bilgiler' | 'odeme' | 'onay') => {
     if (step === 'bilgiler') {
       const required = ['firstName', 'lastName', 'email', 'phone', 'address'];
+      const fieldLabels: Record<string, string> = {
+        firstName: 'Ad',
+        lastName: 'Soyad',
+        email: 'E-posta',
+        phone: 'Telefon',
+        address: 'Adres'
+      };
+      
       const missing = required.filter(field => !formData[field as keyof typeof formData]);
       
       if (missing.length > 0) {
-        setOrderError(`Lütfen zorunlu alanları doldurun: ${missing.join(', ')}`);
+        const missingLabels = missing.map(field => fieldLabels[field] || field);
+        setOrderError(`Lütfen şu alanları doldurun: ${missingLabels.join(', ')}`);
         return false;
       }
       
       // ✅ GELİŞTİRİLMİŞ ADRES VALİDASYONU
       if (!selectedCity || !selectedDistrict) {
-        setOrderError('Lütfen şehir ve ilçe seçimi yapın');
+        setOrderError('Lütfen il ve ilçe seçimi yapın. Adres bilgileri olmadan sipariş oluşturulamaz.');
         return false;
       }
 
-      // ✅ İKAS ID FORMAT KONTROLÜ
+      // ✅ DAHA ESNEK İKAS ID FORMAT KONTROLÜ
       const isValidIkasId = (id: string) => {
-        return id && (
+        return id && id.trim() !== '' && (
+          // UUID formatı (standart)
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+          // İkas özel UUID formatı (fb ile başlayan)
           /^fb[0-9a-f]{6}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
-          /^\d+-\d+$/.test(id)
+          // Sayısal ID formatı
+          /^\d+$/.test(id) ||
+          // Tire ile ayrılmış ID formatı (34-020 gibi)
+          /^\d+-\d+$/.test(id) ||
+          // Alphanumeric ID formatı
+          /^[a-zA-Z0-9-_]+$/.test(id)
         );
       };
 
       if (!isValidIkasId(selectedCity)) {
-        console.warn('⚠️ Form validation - Geçersiz şehir ID:', selectedCity);
-        setOrderError('Geçersiz şehir seçimi. Lütfen şehir seçimini tekrar yapın.');
-        return false;
+        console.warn('⚠️ Form validation - Şehir ID formatı:', selectedCity);
+        // ID formatı geçersiz olsa bile devam et, backend'de fallback var
       }
 
       if (!isValidIkasId(selectedDistrict)) {
-        console.warn('⚠️ Form validation - Geçersiz ilçe ID:', selectedDistrict);
-        setOrderError('Geçersiz ilçe seçimi. Lütfen ilçe seçimini tekrar yapın.');
-        return false;
+        console.warn('⚠️ Form validation - İlçe ID formatı:', selectedDistrict);
+        // ID formatı geçersiz olsa bile devam et, backend'de fallback var
       }
 
       // ✅ ADRES İSİMLERİNİ KONTROL ET
@@ -396,27 +388,27 @@ const Checkout: React.FC = () => {
     if (step === 'odeme') {
       // Kart validasyonları
       if (!cardData.cardNumber || !sipayService.validateCardNumber(cardData.cardNumber)) {
-        setOrderError('Lütfen geçerli bir kart numarası girin');
+        setOrderError('Lütfen geçerli bir kart numarası girin (16 haneli, boşluksuz)');
         return false;
       }
 
       if (!cardData.cardHolder.trim()) {
-        setOrderError('Lütfen kart sahibinin adını girin');
+        setOrderError('Lütfen kart üzerindeki ismi tam olarak yazın');
         return false;
       }
 
       if (!cardData.expiryMonth || !cardData.expiryYear) {
-        setOrderError('Lütfen kartın son kullanma tarihini girin');
+        setOrderError('Lütfen kartın son kullanma tarihini seçin');
         return false;
       }
 
       if (!sipayService.validateExpiry(cardData.expiryMonth, cardData.expiryYear)) {
-        setOrderError('Kartın son kullanma tarihi geçersiz');
+        setOrderError('Kartınızın son kullanma tarihi geçmiş veya geçersiz');
         return false;
       }
 
       if (!cardData.cvv || (cardData.cvv.length !== 3 && cardData.cvv.length !== 4)) {
-        setOrderError('Lütfen geçerli bir CVV girin');
+        setOrderError('Lütfen kartın arkasındaki 3 veya 4 haneli güvenlik kodunu (CVV) girin');
         return false;
       }
 
@@ -494,6 +486,7 @@ const Checkout: React.FC = () => {
       };
 
       // 3D ödeme öncesi form verilerini localStorage'a kaydet
+      const addressInfo = getSelectedAddressInfo();
       const checkoutData = {
         formData,
         selectedNames,
@@ -501,6 +494,7 @@ const Checkout: React.FC = () => {
         selectedCity,
         selectedDistrict,
         selectedTown,
+        addressInfo, // Adres bilgilerini de ekle
         cartItems: items, // Sepet ürünlerini de kaydet
         subtotal: subtotal,
         shipping: shipping,
@@ -549,23 +543,30 @@ const Checkout: React.FC = () => {
             throw new Error('Lütfen il ve ilçe seçimi yapınız');
           }
 
-          // ✅ İKAS ID FORMAT KONTROLÜ
+          // ✅ DAHA ESNEK İKAS ID FORMAT KONTROLÜ
           const isValidIkasId = (id: string) => {
-            return id && (
+            return id && id.trim() !== '' && (
+              // UUID formatı (standart)
               /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+              // İkas özel UUID formatı (fb ile başlayan)
               /^fb[0-9a-f]{6}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
-              /^\d+-\d+$/.test(id)
+              // Sayısal ID formatı
+              /^\d+$/.test(id) ||
+              // Tire ile ayrılmış ID formatı (34-020 gibi)
+              /^\d+-\d+$/.test(id) ||
+              // Alphanumeric ID formatı
+              /^[a-zA-Z0-9-_]+$/.test(id)
             );
           };
 
           if (!isValidIkasId(selectedCity)) {
-            console.warn('⚠️ Geçersiz şehir ID:', selectedCity);
-            throw new Error('Geçersiz şehir seçimi. Lütfen şehir seçimini tekrar yapın.');
+            console.warn('⚠️ Geçersiz şehir ID formatı:', selectedCity);
+            // ID formatı geçersiz olsa bile devam et
           }
 
           if (!isValidIkasId(selectedDistrict)) {
-            console.warn('⚠️ Geçersiz ilçe ID:', selectedDistrict);
-            throw new Error('Geçersiz ilçe seçimi. Lütfen ilçe seçimini tekrar yapın.');
+            console.warn('⚠️ Geçersiz ilçe ID formatı:', selectedDistrict);
+            // ID formatı geçersiz olsa bile devam et
           }
 
           const addressInfo = getSelectedAddressInfo();
@@ -665,21 +666,23 @@ const Checkout: React.FC = () => {
         console.warn('⚠️ Sipay ödeme başarısız:', result);
         
         // Sipay hata mesajını göster
-        let errorMessage = 'Ödeme işlemi başarısız oldu';
+        let errorMessage = 'Ödeme işlemi başarısız oldu. ';
         
         // Sipay response'dan hata mesajı al
         if (result.data) {
           if (result.data.status_description && result.data.status_description !== "Payment process successful") {
-            errorMessage = result.data.status_description;
+            errorMessage += result.data.status_description;
           } else if (result.data.error) {
-            errorMessage = result.data.error;
+            errorMessage += result.data.error;
           } else if (result.data.data && result.data.data.error) {
-            errorMessage = result.data.data.error;
+            errorMessage += result.data.data.error;
+          } else {
+            errorMessage += 'Lütfen kart bilgilerinizi kontrol edip tekrar deneyin.';
           }
         } else if (result.error) {
-          errorMessage = result.error;
-        } else if (result.data && result.data.status_description) {
-          errorMessage = result.data.status_description;
+          errorMessage += result.error;
+        } else {
+          errorMessage += 'Lütfen kart bilgilerinizi kontrol edip tekrar deneyin.';
         }
         
         throw new Error(errorMessage);

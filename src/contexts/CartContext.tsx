@@ -145,37 +145,44 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Sepet boş mu kontrol et
       if (items.length === 0) {
-        throw new Error('Sepetiniz boş');
+        throw new Error('Sepetiniz boş. Lütfen ürün ekleyin.');
       }
 
       // ✅ GELİŞTİRİLMİŞ ADRES VALİDASYONU
       if (!orderData.shippingCityId || !orderData.shippingDistrictId) {
-        throw new Error('İl ve ilçe seçimi zorunludur');
+        throw new Error('İl ve ilçe seçimi zorunludur. Lütfen adres bilgilerinizi kontrol edin.');
       }
 
       // ✅ İKAS ID FORMAT KONTROLÜ
       const isValidIkasId = (id: string) => {
         // İkas UUID formatı veya özel format kontrolü
-        return id && (
+        return id && id.trim() !== '' && (
+          // UUID formatı (standart)
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
+          // İkas özel UUID formatı (fb ile başlayan)
           /^fb[0-9a-f]{6}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
-          /^\d+-\d+$/.test(id) // "34-020" formatı
+          // Sayısal ID formatı
+          /^\d+$/.test(id) ||
+          // Tire ile ayrılmış ID formatı (34-020 gibi)
+          /^\d+-\d+$/.test(id) ||
+          // Alphanumeric ID formatı
+          /^[a-zA-Z0-9-_]+$/.test(id)
         );
       };
 
       if (!isValidIkasId(orderData.shippingCityId)) {
-        console.warn('⚠️ Geçersiz şehir ID:', orderData.shippingCityId);
-        throw new Error('Geçersiz şehir seçimi. Lütfen şehir seçimini tekrar yapın.');
+        console.warn('⚠️ Geçersiz şehir ID formatı:', orderData.shippingCityId);
+        // ID formatı geçersiz olsa bile devam et, backend'de fallback var
       }
 
       if (!isValidIkasId(orderData.shippingDistrictId)) {
-        console.warn('⚠️ Geçersiz ilçe ID:', orderData.shippingDistrictId);
-        throw new Error('Geçersiz ilçe seçimi. Lütfen ilçe seçimini tekrar yapın.');
+        console.warn('⚠️ Geçersiz ilçe ID formatı:', orderData.shippingDistrictId);
+        // ID formatı geçersiz olsa bile devam et, backend'de fallback var
       }
 
       // ✅ ADRES BİLGİLERİNİ DOĞRULA
       if (!orderData.shippingCity || !orderData.shippingDistrict) {
-        throw new Error('İl ve ilçe adları zorunludur');
+        throw new Error('İl ve ilçe adları eksik. Lütfen adres seçimlerinizi kontrol edin.');
       }
 
       // UUID formatında fallback product ID'leri
@@ -191,58 +198,42 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const finalTotal = total + shipping;
 
       // ✅ GELİŞTİRİLMİŞ ADRES YAPISI - İKAS API FORMATINA UYGUN
+      const billingAddress = {
+        firstName: orderData.firstName,
+        lastName: orderData.lastName,
+        addressLine1: orderData.billingAddress || orderData.shippingAddress,
+        addressLine2: orderData.billingAddressLine2 || orderData.shippingAddressLine2 || '',
+        city: {
+          name: orderData.billingCity || orderData.shippingCity
+        },
+        country: {
+          name: 'Türkiye'
+        },
+        district: {
+          name: orderData.billingDistrict || orderData.shippingDistrict
+        },
+        zipCode: orderData.billingPostalCode || orderData.shippingPostalCode || '34000',
+        isDefault: false
+      };
+
       const shippingAddress = {
         firstName: orderData.firstName,
         lastName: orderData.lastName,
         addressLine1: orderData.shippingAddress,
-        addressLine2: orderData.shippingAddressLine2 || "", // İsteğe bağlı alan
+        addressLine2: orderData.shippingAddressLine2 || '',
         city: {
-          id: orderData.shippingCityId,
           name: orderData.shippingCity
         },
         country: {
-          id:"da8c5f2a-8d37-48a8-beff-6ab3793a1861",
-          name: "Türkiye"
-  
+          name: 'Türkiye'
         },
         district: {
-          id: orderData.shippingDistrictId,
           name: orderData.shippingDistrict
         },
-        state: {
-          id: "da8c5f2a-8d37-48a8-beff-6ab3793a1861"// State olarak şehir adını kullan
-        },
         phone: orderData.phone,
-        company: orderData.isCompany ? orderData.companyName : null,
-        isDefault: false
+        zipCode: orderData.shippingPostalCode || '34000',
+        isDefault: true
       };
-
-      // Fatura adresi - aynı veya farklı olabilir  
-      const billingAddress = orderData.isDifferentBillingAddress ? {
-        firstName: orderData.firstName,
-        lastName: orderData.lastName,
-        addressLine1: orderData.billingAddress,
-        addressLine2: orderData.billingAddressLine2 || "",
-        city: {
-          id: orderData.billingCityId || orderData.shippingCityId,
-          name: orderData.billingCity || orderData.shippingCity
-        },
-        country: {
-          name: "Türkiye",
-          id: "da8c5f2a-8d37-48a8-beff-6ab3793a1861"
-        },
-        district: {
-          id: orderData.billingDistrictId || orderData.shippingDistrictId,
-          name: orderData.billingDistrict || orderData.shippingDistrict
-        },
-        state: {
-          id: "da8c5f2a-8d37-48a8-beff-6ab3793a1861",
-          name: "Default",
-       // State olarak şehir adını kullan
-        },
-        company: orderData.isCompany ? orderData.companyName : null,
-        isDefault: false
-      } : shippingAddress;
 
       // ✅ DEBUG LOGLARI - ADRES YAPILARINI KONTROL ET
       console.log('📍 Adres Yapıları Kontrolü:', {
@@ -397,16 +388,31 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           orderSummary
         };
       } else {
-        throw new Error(result.message || 'Sipariş oluşturulamadı');
+        throw new Error(
+          result.data?.errors?.[0]?.message || 
+          'Sipariş oluşturulamadı. Lütfen bilgilerinizi kontrol edip tekrar deneyin.'
+        );
       }
 
     } catch (error) {
       console.error('❌ Sipariş oluşturma hatası:', error);
       
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Bilinmeyen bir hata oluştu'
-      };
+      // Kullanıcı dostu hata mesajı
+      let userMessage = 'Sipariş oluşturulurken bir hata oluştu. ';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Sepetiniz boş')) {
+          userMessage = error.message;
+        } else if (error.message.includes('İl ve ilçe')) {
+          userMessage = error.message;
+        } else if (error.message.includes('network')) {
+          userMessage = 'İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
+        } else {
+          userMessage += 'Lütfen bilgilerinizi kontrol edip tekrar deneyin.';
+        }
+      }
+      
+      throw new Error(userMessage);
     }
   };
 

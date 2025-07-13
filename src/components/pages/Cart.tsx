@@ -1,11 +1,56 @@
-import React from 'react';
-import { Trash2, ChevronLeft, ChevronRight, ShoppingBag, CreditCard, Shield, ArrowLeft } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Trash2, ChevronLeft, ChevronRight, ShoppingBag, CreditCard, Shield, ArrowLeft, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
 
 const Cart: React.FC = () => {
-  const { items, updateQuantity, removeItem } = useCart();
+  const { items, updateQuantity, removeItem, clearCart } = useCart();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [paymentMessage, setPaymentMessage] = useState<{type: 'success' | 'error' | null, message: string}>({type: null, message: ''});
+
+  // URL parametrelerini kontrol et
+  useEffect(() => {
+    const paymentSuccess = searchParams.get('payment_success');
+    const invoiceId = searchParams.get('invoice_id');
+    const orderNo = searchParams.get('order_no');
+    const ikasOrderId = searchParams.get('ikas_order_id');
+    const ikasOrderNumber = searchParams.get('ikas_order_number');
+    const error = searchParams.get('error');
+
+    if (paymentSuccess === '1') {
+      // Ödeme başarılı
+      setPaymentMessage({
+        type: 'success',
+        message: `Ödemeniz başarıyla tamamlandı! ${ikasOrderNumber ? `Sipariş No: ${ikasOrderNumber}` : `Fatura No: ${invoiceId}`}`
+      });
+      // Sepeti temizle
+      clearCart();
+      
+      // URL'deki parametreleri temizle (5 saniye sonra)
+      setTimeout(() => {
+        navigate('/cart', { replace: true });
+        setPaymentMessage({type: null, message: ''});
+      }, 5000);
+    } else if (paymentSuccess === '0' || error) {
+      // Ödeme başarısız
+      const errorMessage = error === 'payment_failed' ? 'Ödeme işlemi başarısız oldu.' :
+                          error === 'hash_validation_failed' ? 'Güvenlik doğrulaması başarısız.' :
+                          error === 'system_error' ? 'Sistem hatası oluştu.' :
+                          'Ödeme işlemi sırasında bir hata oluştu.';
+      
+      setPaymentMessage({
+        type: 'error',
+        message: errorMessage
+      });
+      
+      // Hata mesajını 8 saniye sonra kaldır
+      setTimeout(() => {
+        navigate('/cart', { replace: true });
+        setPaymentMessage({type: null, message: ''});
+      }, 8000);
+    }
+  }, [searchParams, navigate, clearCart]);
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shipping = subtotal > 150 ? 0 : 29.90;
@@ -26,6 +71,24 @@ const Cart: React.FC = () => {
         </div>
 
         <h1 className="text-4xl font-bold text-gray-900 mb-10">Sepetim</h1>
+
+        {/* Ödeme durumu mesajı */}
+        {paymentMessage.type && (
+          <div className={`mb-8 p-4 rounded-2xl border-2 ${
+            paymentMessage.type === 'success' 
+              ? 'bg-green-50 border-green-200 text-green-800' 
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            <div className="flex items-center gap-3">
+              {paymentMessage.type === 'success' ? (
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              ) : (
+                <XCircle className="w-6 h-6 text-red-600" />
+              )}
+              <p className="font-medium">{paymentMessage.message}</p>
+            </div>
+          </div>
+        )}
 
         {items.length === 0 ? (
           <div className="bg-white rounded-3xl shadow-xl p-12 text-center">

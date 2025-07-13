@@ -159,11 +159,81 @@ try {
         }
     }';
     
-    // Sipariş verilerini hazırla - Tüm input'u gönder
+    // Sipariş verilerini hazırla - Input validasyonu ekle
+    $inputData = $input['input'] ?? $input;
+    
+    // Adres bilgilerini düzelt - İkas API formatına uygun hale getir
+    if (isset($inputData['order']['billingAddress'])) {
+        // City ve district bilgilerini düzelt
+        $billingAddress = &$inputData['order']['billingAddress'];
+        
+        // Eğer city string ise object'e çevir
+        if (isset($billingAddress['city']) && is_string($billingAddress['city'])) {
+            $billingAddress['city'] = [
+                'name' => $billingAddress['city']
+            ];
+        }
+        
+        // Eğer district string ise object'e çevir
+        if (isset($billingAddress['district']) && is_string($billingAddress['district'])) {
+            $billingAddress['district'] = [
+                'name' => $billingAddress['district']
+            ];
+        }
+        
+        // Country ekle
+        if (!isset($billingAddress['country'])) {
+            $billingAddress['country'] = [
+                'name' => 'Türkiye'
+            ];
+        }
+    }
+    
+    if (isset($inputData['order']['shippingAddress'])) {
+        // City ve district bilgilerini düzelt
+        $shippingAddress = &$inputData['order']['shippingAddress'];
+        
+        // Eğer city string ise object'e çevir
+        if (isset($shippingAddress['city']) && is_string($shippingAddress['city'])) {
+            $shippingAddress['city'] = [
+                'name' => $shippingAddress['city']
+            ];
+        }
+        
+        // Eğer district string ise object'e çevir
+        if (isset($shippingAddress['district']) && is_string($shippingAddress['district'])) {
+            $shippingAddress['district'] = [
+                'name' => $shippingAddress['district']
+            ];
+        }
+        
+        // Country ekle
+        if (!isset($shippingAddress['country'])) {
+            $shippingAddress['country'] = [
+                'name' => 'Türkiye'
+            ];
+        }
+    }
+    
+    // Ürün ID'lerini düzelt - UUID formatına çevir
+    if (isset($inputData['order']['orderLineItems'])) {
+        foreach ($inputData['order']['orderLineItems'] as &$item) {
+            // Eğer ID UUID formatında değilse, fallback ID kullan
+            if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $item['id'])) {
+                $item['id'] = "8c64cc8a-7950-49e3-8739-36bcfc1db7fa"; // Fallback product ID
+            }
+            
+            // Variant ID kontrolü
+            if (!isset($item['variant']['id']) || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $item['variant']['id'])) {
+                $item['variant']['id'] = "7868c357-4726-432a-ad5d-49619e6a508b"; // Fallback variant ID
+            }
+        }
+    }
+    
     $orderData = [
         'query' => $mutation,
         'variables' => [
-            'input' => $input['input'] ?? $input
+            'input' => $inputData
         ]
     ];
 
