@@ -186,7 +186,7 @@ const Checkout: React.FC = () => {
       }));
 
       const paymentData = {
-        payment_type: '2D' as const,
+        payment_type: '3D' as const,
         cc_holder_name: cardData.cardHolder,
         cc_no: cardData.cardNumber.replace(/\s/g, ''),
         expiry_month: cardData.expiryMonth.padStart(2, '0'),
@@ -200,8 +200,8 @@ const Checkout: React.FC = () => {
         surname: formData.lastName,
         total: total,
         items: cartItems,
-        cancel_url: `${window.location.origin}/checkout?status=cancel`,
-        return_url: `${window.location.origin}/checkout?status=success`,
+        cancel_url: `${window.location.origin}/sipay_3d_return.php`,
+        return_url: `${window.location.origin}/sipay_3d_return.php`,
         bill_address1: formData.address,
         bill_city: selectedNames.cityName,
         bill_state: selectedNames.districtName,
@@ -216,9 +216,16 @@ const Checkout: React.FC = () => {
       const result = await sipayService.processPayment(paymentData);
 
       if (result.success && result.data) {
-        // Ödeme başarılı
-        console.log('✅ Sipay ödeme başarılı:', result);
-        
+        // 3D ödeme için HTML response check
+        if (paymentData.payment_type === '3D' && result.data.form_html) {
+          console.log('🔄 3D ödeme formu submit ediliyor...');
+          document.open();
+          document.write(result.data.form_html);
+          document.close();
+          return;
+        }
+
+        // 2D fallback veya 3D tamamlandıysa
         setOrderData({
           success: true,
           orderId: invoiceId,
@@ -232,19 +239,13 @@ const Checkout: React.FC = () => {
             formData: formData
           }
         });
-        
         setActiveStep('onay');
         clearCart();
-        
-        // URL'yi güncelle
         window.history.replaceState({}, '', '/checkout?status=success');
-        
       } else {
-        // Ödeme başarısız
         console.warn('⚠️ Sipay ödeme başarısız:', result);
         throw new Error(result.data?.message || 'Ödeme işlemi başarısız oldu');
       }
-      
     } catch (error) {
       console.error('❌ Sipay ödeme hatası:', error);
       setOrderError(error instanceof Error ? error.message : 'Ödeme işlemi sırasında bir hata oluştu');

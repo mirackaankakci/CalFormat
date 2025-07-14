@@ -306,8 +306,8 @@ class SiPayService {
 
       console.log('📤 SiPay\'a gönderilen veri:', {
         ...requestData,
-        cc_no: '****' + paymentData.cc_no.slice(-4), // Güvenlik için sadece son 4 hane
-        cvv: '***' // CVV'yi gizle
+        cc_no: '****' + paymentData.cc_no.slice(-4),
+        cvv: '***'
       });
 
       const response = await fetch(this.baseUrl, {
@@ -319,13 +319,6 @@ class SiPayService {
         body: JSON.stringify(requestData)
       });
 
-      console.log('📥 SiPay yanıt durumu:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
-      // JSON response (2D ödeme veya 3D form)
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
@@ -334,26 +327,25 @@ class SiPayService {
       const data = await response.json();
       
       // Backend'den 3D form HTML'i geldi mi kontrol et
-      if (data.success && data.redirect_form) {
-        console.log('🌐 3D ödeme HTML formu alındı (JSON response), yeni tab açılıyor...');
+      if (data.success && (data.form_html || data.redirect_form)) {
+        console.log('🌐 3D ödeme HTML formu alındı, sayfaya yazılıyor...');
         
-        const newWindow = window.open('', '_blank');
-        if (newWindow) {
-          newWindow.document.write(data.redirect_form);
-          newWindow.document.close();
-        }
+        // Form HTML'ini doğrudan sayfaya yaz
+        const formHtml = data.form_html || data.redirect_form;
+        document.open();
+        document.write(formHtml);
+        document.close();
         
         return {
           success: true,
           payment_type: '3D',
+          data: { form_html: formHtml },
           invoice_id: data.invoice_id || paymentData.invoice_id,
           message: data.message || '3D ödeme başlatıldı',
           timestamp: new Date().toISOString()
         };
       }
 
-      console.log('📥 SiPay yanıt verisi:', data);
-      
       console.log('✅ SiPay ödeme yanıtı:', data);
       
       // Başarısızlık durumunu kontrol et

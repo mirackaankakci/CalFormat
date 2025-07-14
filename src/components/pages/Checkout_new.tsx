@@ -494,13 +494,13 @@ const Checkout: React.FC = () => {
         selectedCity,
         selectedDistrict,
         selectedTown,
-        addressInfo, // Adres bilgilerini de ekle
-        cartItems: items, // Sepet ürünlerini de kaydet
+        addressInfo,
+        cartItems: items,
         subtotal: subtotal,
         shipping: shipping,
         total: total,
-        invoiceId: invoiceId, // Invoice ID'yi de kaydet
-        timestamp: Date.now() // Timestamp ekle
+        invoiceId: invoiceId,
+        timestamp: Date.now()
       };
       
       localStorage.setItem('checkout_form_data', JSON.stringify(checkoutData));
@@ -522,12 +522,11 @@ const Checkout: React.FC = () => {
         if (paymentData.payment_type === '3D' && result.data.form_html) {
           console.log('🔄 3D ödeme formu submit ediliyor...');
           
-          // Sayfayı temizle ve direkt HTML'i yaz
+          // Form HTML'ini doğrudan sayfaya yaz
           document.open();
           document.write(result.data.form_html);
           document.close();
           
-          // İşlem tamamlandı, return'den geleni bekle
           return;
         }
         
