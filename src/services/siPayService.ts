@@ -272,13 +272,6 @@ class SiPayService {
    */
   async processPayment(paymentData: SiPayPaymentData): Promise<SiPayResponse> {
     try {
-      console.log('💳 SiPay ödeme işlemi başlatılıyor...', {
-        payment_type: paymentData.payment_type,
-        total: paymentData.total,
-        currency: paymentData.currency_code,
-        invoice_id: paymentData.invoice_id
-      });
-
       // Kart doğrulaması
       const validation = this.validateCard(paymentData);
       if (!validation.isValid) {
@@ -304,12 +297,6 @@ class SiPayService {
         ...paymentData
       };
 
-      console.log('📤 SiPay\'a gönderilen veri:', {
-        ...requestData,
-        cc_no: '****' + paymentData.cc_no.slice(-4),
-        cvv: '***'
-      });
-
       const response = await fetch(this.baseUrl, {
         method: 'POST',
         headers: {
@@ -328,8 +315,6 @@ class SiPayService {
       
       // Backend'den 3D form HTML'i geldi mi kontrol et
       if (data.success && (data.form_html || data.redirect_form)) {
-        console.log('🌐 3D ödeme HTML formu alındı, sayfaya yazılıyor...');
-        
         // Form HTML'ini doğrudan sayfaya yaz
         const formHtml = data.form_html || data.redirect_form;
         document.open();
@@ -345,23 +330,19 @@ class SiPayService {
           timestamp: new Date().toISOString()
         };
       }
-
-      console.log('✅ SiPay ödeme yanıtı:', data);
       
       // Başarısızlık durumunu kontrol et
       if (!data.success) {
-        console.error('💳 SiPay ödeme başarısız:', {
-          message: data.message,
-          error_code: data.error_code,
-          result: data
-        });
+        throw new Error(data.message || data.error || 'Ödeme işlemi başarısız oldu');
       }
       
       return data;
 
     } catch (error) {
-      console.error('❌ SiPay ödeme hatası:', error);
-      throw error;
+      if (error instanceof Error) {
+        throw new Error(`Ödeme işlemi sırasında bir hata oluştu: ${error.message}`);
+      }
+      throw new Error('Bilinmeyen bir hata oluştu');
     }
   }
 
