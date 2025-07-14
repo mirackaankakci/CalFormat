@@ -16,11 +16,19 @@ try {
     $config = require_once __DIR__ . '/config.php';
     $sipayConfig = $config['sipay'];
 
+    // Frontend URL'yi al ve temizle
+    $frontendUrl = $config['frontend_url'] ?? 'https://calformat.com';
+    $frontendUrl = str_replace(['www.', '@', 'w'], '', $frontendUrl); // Yanlış karakterleri temizle
+    $frontendUrl = preg_replace('/^https?:\/\//', '', $frontendUrl); // Protokolü kaldır
+    $frontendUrl = 'https://' . $frontendUrl; // Doğru protokolü ekle
+
     securityLog('3D Return Handler Started', 'INFO', [
         'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown',
         'post_data_exists' => !empty($_POST),
         'get_data_exists' => !empty($_GET),
         'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+        'frontend_url' => $frontendUrl,
+        'config_frontend_url' => $config['frontend_url'] ?? 'not_set',
         'timestamp' => date('Y-m-d H:i:s')
     ]);
 
@@ -266,9 +274,6 @@ try {
         return false;
     }
 
-    // Frontend URL
-    $frontendUrl = $config['frontend_url'];
-    
     // POST verilerini al
     $postData = $_POST;
     $getData = $_GET;
@@ -366,13 +371,14 @@ try {
             if ($ikasOrderResult['success']) {
                 $redirectUrl = $frontendUrl . '/cart?payment_success=1&sipay_status=1&invoice_id=' . urlencode($invoiceId) . '&order_no=' . urlencode($orderNo) . '&ikas_order_id=' . urlencode($ikasOrderResult['order_id']) . '&ikas_order_number=' . urlencode($ikasOrderResult['order_number']);
             } else {
-                $redirectUrl = $frontendUrl . '/cart?payment_success=1&sipay_status=1&invoice_id=' . urlencode($invoiceId) . '&order_no=' . urlencode($orderNo) . '&ikas_order_error=' . urlencode($ikasOrderResult['error']);
+                $redirectUrl = $frontendUrl . '/cart?payment_success=0&sipay_status=1&invoice_id=' . urlencode($invoiceId) . '&order_no=' . urlencode($orderNo) . '&error=' . urlencode($ikasOrderResult['error']);
             }
             
             securityLog('3D Payment SUCCESS - Redirecting', 'INFO', [
                 'redirect_url' => $redirectUrl,
                 'invoice_id' => $invoiceId,
-                'ikas_order_created' => $ikasOrderResult['success']
+                'ikas_order_created' => $ikasOrderResult['success'],
+                'frontend_url' => $frontendUrl
             ]);
         } else {
             $redirectUrl = $frontendUrl . '/cart?payment_success=0&sipay_status=0&invoice_id=' . urlencode($invoiceId) . '&order_no=' . urlencode($orderNo) . '&error=payment_failed';
@@ -404,10 +410,11 @@ try {
     securityLog('3D Return Critical Error', 'ERROR', [
         'error_message' => $e->getMessage(),
         'post_data' => $_POST ?? [],
-        'get_data' => $_GET ?? []
+        'get_data' => $_GET ?? [],
+        'frontend_url' => $frontendUrl ?? 'not_set'
     ]);
     
-    $redirectUrl = ($config['frontend_url'] ?? 'https://calformat.com') . '/cart?payment_success=0&error=system_error';
+    $redirectUrl = 'https://calformat.com/cart?payment_success=0&error=system_error';
     
     header('Location: ' . $redirectUrl);
     exit();

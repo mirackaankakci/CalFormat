@@ -3,6 +3,11 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0); // Production'da 0
 
+// Config dosyasını yükle
+define('INTERNAL_ACCESS', true);
+$config = require_once __DIR__ . '/config.php';
+$ikasConfig = $config['ikas'];
+
 // JSON response için header'lar
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -21,16 +26,6 @@ try {
     if (!$cityId) {
         throw new Exception('cityId parametresi gerekli');
     }
-    
-    // 1. İKAS KONFİGÜRASYON BİLGİLERİ - STATİK
-    $ikasConfig = [
-        'client_id' => '9ca242da-2ce0-44b5-8b3f-4d31e6a94958',
-        'client_secret' => 's_TBvX9kDl7N8FPXlSHp1L3dHFbd1c286fbfb440aa9796a8b851994b32',
-        'store_id' => 'calformat',
-        'base_url' => 'https://calformat.myikas.com/api',
-        'token_url' => 'https://calformat.myikas.com/api/admin/oauth/token',
-        'graphql_url' => 'https://api.myikas.com/api/v1/admin/graphql'
-    ];
     
     // 2. TOKEN ALMA İŞLEMİ
     $tokenUrl = $ikasConfig['token_url'];
@@ -75,7 +70,7 @@ try {
     
     // Fallback token
     if (!$accessToken) {
-        $accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjljYTI0MmRhLTJjZTAtNDRiNS04YjNmLTRkMzFlNmE5NDk1OCIsImVtYWlsIjoibXktaWthcy1hcGkiLCJmaXJzdE5hbWUiOiJteS1pa2FzLWFwaSIsImxhc3ROYW1lIjoiIiwic3RvcmVOYW1lIjoiY2FsZm9ybWF0IiwibWVyY2hhbnRJZCI6ImM3NjVkMTFmLTA3NmYtNGE1OS04MTE2LTZkYzhmNzM2ZjI2YyIsImZlYXR1cmVzIjpbMTAsMTEsMTIsMiwyMDEsMyw0LDUsNyw4LDldLCJhdXRob3JpemVkQXBwSWQiOiI5Y2EyNDJkYS0yY2UwLTQ0YjUtOGIzZi00ZDMxZTZhOTQ5NTgiLCJzYWxlc0NoYW5uZWxJZCI6IjIwNjYxNzE2LTkwZWMtNDIzOC05MDJhLTRmMDg0MTM0NThjOCIsInR5cGUiOjQsImV4cCI6MTc1MTYzNjU2NjU3NywiaWF0IjoxNzUxNjIyMTY2NTc3LCJpc3MiOiJjNzY1ZDExZi0wNzZmLTRhNTktODExNi02ZGM4ZjczNmYyNmMiLCJzdWIiOiI5Y2EyNDJkYS0yY2UwLTQ0YjUtOGIzZi00ZDMxZTZhOTQ5NTgifQ.GiPopPyJgavFgIopNdaJqYm_ER0M92aTfQaIwuLFiMw';
+        $accessToken = $ikasConfig['api_token'];
         $tokenMethod = 'fallback';
     }
 

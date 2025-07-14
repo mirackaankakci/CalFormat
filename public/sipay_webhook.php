@@ -194,7 +194,7 @@ try {
             'success' => true,
             'service' => 'SiPay Webhook Handler',
             'description' => 'Yinelenen ödemeler ve ödeme durumu bildirimleri',
-            'webhook_url' => 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'],
+            'webhook_url' => str_replace('www.', '', 'https://' . $_SERVER['HTTP_HOST']) . $_SERVER['REQUEST_URI'],
             'supported_methods' => ['POST'],
             'security' => [
                 'hash_validation' => 'AES-256-CBC',

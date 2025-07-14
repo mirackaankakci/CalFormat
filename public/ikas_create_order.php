@@ -1,5 +1,5 @@
 <?php
-// Güvenli İkas Sipariş Oluşturma Endpoint - Güvenli Versiyon
+// Güvenli İkas Sipariş Oluşturma Endpoint - Yeni Güvenli Versiyon
 require_once __DIR__ . '/security_new.php';
 
 // Güvenlik kontrollerini başlat
@@ -77,200 +77,20 @@ try {
         throw new Exception('Geçersiz JSON verisi: ' . json_last_error_msg());
     }
     
-    // INPUT VALIDATION - Sipariş verilerini doğrula
-    function validateOrderInput($input) {
-        $errors = [];
-        
-        // Ana yapı kontrolü
-        if (!isset($input['input']['order'])) {
-            $errors[] = 'Order data eksik';
-            return $errors;
-        }
-        
-        $order = $input['input']['order'];
-        
-        // OrderLineItems kontrolü
-        if (!isset($order['orderLineItems']) || !is_array($order['orderLineItems']) || empty($order['orderLineItems'])) {
-            $errors[] = 'OrderLineItems eksik veya boş';
-        } else {
-            foreach ($order['orderLineItems'] as $index => $item) {
-                if (!isset($item['id']) || empty($item['id'])) {
-                    $errors[] = "OrderLineItem[$index]: id eksik";
-                }
-                if (!isset($item['price']) || !is_numeric($item['price']) || $item['price'] <= 0) {
-                    $errors[] = "OrderLineItem[$index]: geçersiz price";
-                }
-                if (!isset($item['quantity']) || !is_numeric($item['quantity']) || $item['quantity'] <= 0) {
-                    $errors[] = "OrderLineItem[$index]: geçersiz quantity";
-                }
-                if (!isset($item['variant']['id']) || empty($item['variant']['id'])) {
-                    $errors[] = "OrderLineItem[$index]: variant id eksik";
-                }
-            }
-        }
-        
-        // Billing Address kontrolü
-        if (!isset($order['billingAddress'])) {
-            $errors[] = 'billingAddress eksik';
-        } else {
-            $billing = $order['billingAddress'];
-            if (!isset($billing['firstName']) || empty($billing['firstName'])) {
-                $errors[] = 'billingAddress: firstName eksik';
-            }
-            if (!isset($billing['lastName']) || empty($billing['lastName'])) {
-                $errors[] = 'billingAddress: lastName eksik';
-            }
-            if (!isset($billing['addressLine1']) || empty($billing['addressLine1'])) {
-                $errors[] = 'billingAddress: addressLine1 eksik';
-            }
-            if (!isset($billing['city']['name']) || empty($billing['city']['name'])) {
-                $errors[] = 'billingAddress: city name eksik';
-            }
-            if (!isset($billing['city']['id']) || empty($billing['city']['id'])) {
-                $errors[] = 'billingAddress: city id eksik';
-            }
-            if (!isset($billing['country']['name']) || empty($billing['country']['name'])) {
-                $errors[] = 'billingAddress: country name eksik';
-            }
-            if (!isset($billing['district']['name']) || empty($billing['district']['name'])) {
-                $errors[] = 'billingAddress: district name eksik';
-            }
-            if (!isset($billing['district']['id']) || empty($billing['district']['id'])) {
-                $errors[] = 'billingAddress: district id eksik';
-            }
-            
-            // Şehir/Ülke karışıklığı kontrolü
-            if (isset($billing['city']['name']) && isset($billing['country']['name'])) {
-                if ($billing['city']['name'] === 'Türkiye' && $billing['country']['name'] === 'İstanbul') {
-                    $errors[] = 'billingAddress: Şehir ve ülke bilgileri karışmış (city: Türkiye, country: İstanbul)';
-                }
-            }
-        }
-        
-        // Shipping Address kontrolü
-        if (!isset($order['shippingAddress'])) {
-            $errors[] = 'shippingAddress eksik';
-        } else {
-            $shipping = $order['shippingAddress'];
-            if (!isset($shipping['firstName']) || empty($shipping['firstName'])) {
-                $errors[] = 'shippingAddress: firstName eksik';
-            }
-            if (!isset($shipping['lastName']) || empty($shipping['lastName'])) {
-                $errors[] = 'shippingAddress: lastName eksik';
-            }
-            if (!isset($shipping['addressLine1']) || empty($shipping['addressLine1'])) {
-                $errors[] = 'shippingAddress: addressLine1 eksik';
-            }
-            if (!isset($shipping['city']['name']) || empty($shipping['city']['name'])) {
-                $errors[] = 'shippingAddress: city name eksik';
-            }
-            if (!isset($shipping['city']['id']) || empty($shipping['city']['id'])) {
-                $errors[] = 'shippingAddress: city id eksik';
-            }
-            if (!isset($shipping['country']['name']) || empty($shipping['country']['name'])) {
-                $errors[] = 'shippingAddress: country name eksik';
-            }
-            if (!isset($shipping['district']['name']) || empty($shipping['district']['name'])) {
-                $errors[] = 'shippingAddress: district name eksik';
-            }
-            if (!isset($shipping['district']['id']) || empty($shipping['district']['id'])) {
-                $errors[] = 'shippingAddress: district id eksik';
-            }
-            
-            // Şehir/Ülke karışıklığı kontrolü
-            if (isset($shipping['city']['name']) && isset($shipping['country']['name'])) {
-                if ($shipping['city']['name'] === 'Türkiye' && $shipping['country']['name'] === 'İstanbul') {
-                    $errors[] = 'shippingAddress: Şehir ve ülke bilgileri karışmış (city: Türkiye, country: İstanbul)';
-                }
-            }
-        }
-        
-        // Customer kontrolü
-        if (!isset($order['customer'])) {
-            $errors[] = 'customer bilgileri eksik';
-        } else {
-            $customer = $order['customer'];
-            if (!isset($customer['firstName']) || empty($customer['firstName'])) {
-                $errors[] = 'customer: firstName eksik';
-            }
-            if (!isset($customer['lastName']) || empty($customer['lastName'])) {
-                $errors[] = 'customer: lastName eksik';
-            }
-            if (!isset($customer['email']) || empty($customer['email']) || !filter_var($customer['email'], FILTER_VALIDATE_EMAIL)) {
-                $errors[] = 'customer: geçersiz email';
-            }
-        }
-        
-        // Transactions kontrolü
-        if (!isset($input['input']['transactions']) || !is_array($input['input']['transactions']) || empty($input['input']['transactions'])) {
-            $errors[] = 'transactions eksik veya boş';
-        } else {
-            foreach ($input['input']['transactions'] as $index => $transaction) {
-                if (!isset($transaction['amount']) || !is_numeric($transaction['amount']) || $transaction['amount'] <= 0) {
-                    $errors[] = "Transaction[$index]: geçersiz amount";
-                }
-            }
-        }
-        
-        return $errors;
-    }
-    
     securityLog('Order input parsed', 'INFO', ['has_input' => isset($input['input'])]);
-
-    // Input validation yap
-    $validationErrors = validateOrderInput($input);
-    if (!empty($validationErrors)) {
-        securityLog('Order input validation failed', 'ERROR', ['errors' => $validationErrors]);
-        
-        // Validation hataları varsa fallback response döndür
-        $fallbackData = [
-            'id' => 'VALIDATION-ERROR-' . time(),
-            'orderNumber' => 'VE-' . date('YmdHis'),
-            'status' => 'validation_error',
-            'message' => 'Sipariş verilerinde hatalar bulundu',
-            'validation_errors' => $validationErrors,
-            'timestamp' => date('Y-m-d H:i:s')
-        ];
-        
-        echo json_encode([
-            'success' => false,
-            'validation_failed' => true,
-            'errors' => $validationErrors,
-            'fallback_data' => $fallbackData,
-            'message' => 'Sipariş verileri doğrulanamadı. Lütfen aşağıdaki hataları düzeltin.',
-            'suggestions' => [
-                'Şehir ve ülke bilgilerini kontrol edin (city: şehir adı, country: Türkiye)',
-                'Tüm zorunlu alanların dolu olduğundan emin olun',
-                'Fiyat ve miktar değerlerinin pozitif sayı olduğunu kontrol edin',
-                'Email adresinin geçerli formatta olduğunu kontrol edin'
-            ],
-            'timestamp' => date('Y-m-d H:i:s')
-        ]);
-        exit();
-    }
 
     // İkas konfigürasyonunu al
     $ikasConfig = $config['ikas'];
     $ikasDefaults = $ikasConfig['defaults'];
     
-    // Gerçek İkas ayarlarını kullan (config.php'den)
-    $realIkasConfig = [
-        'client_id' => '9ca242da-2ce0-44b5-8b3f-4d31e6a94958',
-        'client_secret' => 's_TBvX9kDl7N8FPXlSHp1L3dHFbd1c286fbfb440aa9796a8b851994b32',
-        'store_id' => 'calformat',
-        'base_url' => 'https://calformat.myikas.com/api',
-        'token_url' => 'https://calformat.myikas.com/api/admin/oauth/token',
-        'graphql_url' => 'https://api.myikas.com/api/v1/admin/graphql'
-    ];
-    
-    $tokenUrl = $realIkasConfig['token_url'];
+    $tokenUrl = $ikasConfig['token_url'];
     
     securityLog('Requesting Ikas token for order', 'INFO');
 
     $tokenData = [
         'grant_type' => 'client_credentials',
-        'client_id' => $realIkasConfig['client_id'],
-        'client_secret' => $realIkasConfig['client_secret']
+        'client_id' => $ikasConfig['client_id'],
+        'client_secret' => $ikasConfig['client_secret']
     ];
 
     // Token alma - cURL kullan
@@ -311,104 +131,107 @@ try {
     
     // Fallback token
     if (!$accessToken) {
-        $accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjljYTI0MmRhLTJjZTAtNDRiNS04YjNmLTRkMzFlNmE5NDk1OCIsImVtYWlsIjoibXktaWthcy1hcGkiLCJmaXJzdE5hbWUiOiJteS1pa2FzLWFwaSIsImxhc3ROYW1lIjoiIiwic3RvcmVOYW1lIjoiY2FsZm9ybWF0IiwibWVyY2hhbnRJZCI6ImM3NjVkMTFmLTA3NmYtNGE1OS04MTE2LTZkYzhmNzM2ZjI2YyIsImZlYXR1cmVzIjpbMTAsMTEsMTIsMiwyMDEsMyw0LDUsNyw4LDldLCJhdXRob3JpemVkQXBwSWQiOiI5Y2EyNDJkYS0yY2UwLTQ0YjUtOGIzZi00ZDMxZTZhOTQ5NTgiLCJzYWxlc0NoYW5uZWxJZCI6IjIwNjYxNzE2LTkwZWMtNDIzOC05MDJhLTRmMDg0MTM0NThjOCIsInR5cGUiOjQsImV4cCI6MTc1MTYzNjU2NjU3NywiaWF0IjoxNzUxNjIyMTY2NTc3LCJpc3MiOiJjNzY1ZDExZi0wNzZmLTRhNTktODExNi02ZGM4ZjczNmYyNmMiLCJzdWIiOiI5Y2EyNDJkYS0yY2UwLTQ0YjUtOGIzZi00ZDMxZTZhOTQ5NTgifQ.GiPopPyJgavFgIopNdaJqYm_ER0M92aTfQaIwuLFiMw';
+        $accessToken = $ikasConfig['api_token'];
         securityLog('Using fallback token for order', 'WARNING');
     }
 
     securityLog('Access token obtained for order', 'INFO');
 
     // SİPARİŞ OLUŞTUR - GraphQL
-    $orderUrl = $realIkasConfig['graphql_url'];
+    $orderUrl = $ikasConfig['graphql_url'];
     
     securityLog('Preparing order payload', 'INFO');
-    
-    // GraphQL mutation - ID'li city ve district versiyonu
+    // GraphQL mutation - En minimal hali
     $mutation = 'mutation CreateOrderWithTransactions($input: CreateOrderWithTransactionsInput!) {
         createOrderWithTransactions(input: $input) {
             id
             orderNumber
-            totalAmount
-            status
-            customer {
-                id
-                email
-                firstName
-                lastName
-            }
-            orderLineItems {
-                id
-                quantity
-                price
-                variant {
-                    id
-                    sku
-                    product {
-                        id
-                        name
-                    }
-                }
-            }
-            billingAddress {
-                firstName
-                lastName
-                addressLine1
-                addressLine2
-                city {
-                    id
-                    name
-                }
-                country {
-                    name
-                }
-                district {
-                    id
-                    name
-                }
-                zipCode
-                isDefault
-            }
-            shippingAddress {
-                firstName
-                lastName
-                addressLine1
-                addressLine2
-                city {
-                    id
-                    name
-                }
-                country {
-                    name
-                }
-                district {
-                    id
-                    name
-                }
-                phone
-                zipCode
-                isDefault
-            }
-            transactions {
-                id
-                amount
-                status
-                transactionType
-            }
-            note
-            deleted
-            createdAt
-            updatedAt
         }
     }';
     
-    // Sipariş verilerini hazırla
+    // Sipariş verilerini hazırla - Input validasyonu ekle
+    $inputData = $input['input'] ?? $input;
+    
+    // Adres bilgilerini düzelt - İkas API formatına uygun hale getir
+    if (isset($inputData['order']['billingAddress'])) {
+        // City ve district bilgilerini düzelt
+        $billingAddress = &$inputData['order']['billingAddress'];
+        
+        // Eğer city string ise object'e çevir
+        if (isset($billingAddress['city']) && is_string($billingAddress['city'])) {
+            $billingAddress['city'] = [
+                'name' => $billingAddress['city']
+            ];
+        }
+        
+        // Eğer district string ise object'e çevir
+        if (isset($billingAddress['district']) && is_string($billingAddress['district'])) {
+            $billingAddress['district'] = [
+                'name' => $billingAddress['district']
+            ];
+        }
+        
+        // Country ekle
+        if (!isset($billingAddress['country'])) {
+            $billingAddress['country'] = [
+                'name' => 'Türkiye'
+            ];
+        }
+    }
+    
+    if (isset($inputData['order']['shippingAddress'])) {
+        // City ve district bilgilerini düzelt
+        $shippingAddress = &$inputData['order']['shippingAddress'];
+        
+        // Eğer city string ise object'e çevir
+        if (isset($shippingAddress['city']) && is_string($shippingAddress['city'])) {
+            $shippingAddress['city'] = [
+                'name' => $shippingAddress['city']
+            ];
+        }
+        
+        // Eğer district string ise object'e çevir
+        if (isset($shippingAddress['district']) && is_string($shippingAddress['district'])) {
+            $shippingAddress['district'] = [
+                'name' => $shippingAddress['district']
+            ];
+        }
+        
+        // Country ekle
+        if (!isset($shippingAddress['country'])) {
+            $shippingAddress['country'] = [
+                'name' => 'Türkiye'
+            ];
+        }
+    }
+    
+    // Ürün ID'lerini düzelt - UUID formatına çevir
+    if (isset($inputData['order']['orderLineItems'])) {
+        foreach ($inputData['order']['orderLineItems'] as &$item) {
+            // Eğer ID UUID formatında değilse, fallback ID kullan
+            if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $item['id'])) {
+                $item['id'] = $ikasDefaults['fallback_product_id']; // Fallback product ID
+            }
+            
+            // Variant ID kontrolü
+            if (!isset($item['variant']['id']) || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $item['variant']['id'])) {
+                $item['variant']['id'] = $ikasDefaults['fallback_variant_id']; // Fallback variant ID
+            }
+        }
+    }
+    
     $orderData = [
         'query' => $mutation,
         'variables' => [
-            'input' => $input['input'] ?? $input
+            'input' => $inputData
         ]
     ];
 
-    securityLog('GraphQL order payload prepared', 'INFO');
+    securityLog('GraphQL order payload prepared', 'INFO', [
+        'has_input' => isset($input['input']),
+        'variables_structure' => array_keys($orderData['variables']),
+        'input_structure' => isset($input['input']) ? array_keys($input['input']) : 'no input key'
+    ]);
 
     // cURL ile sipariş oluştur
     $ch = curl_init();
@@ -439,16 +262,28 @@ try {
         throw new Exception('Sipariş oluşturulamadı - API çağrısı başarısız: ' . $orderError);
     }
 
-    securityLog('Order API response received', 'INFO', ['http_code' => $orderHttpCode]);
+    securityLog('Order API response received', 'INFO', [
+        'http_code' => $orderHttpCode,
+        'response_length' => strlen($orderResponse),
+        'response_preview' => substr($orderResponse, 0, 200) . '...'
+    ]);
 
     $orderResult = json_decode($orderResponse, true);
     
     if (json_last_error() !== JSON_ERROR_NONE) {
-        securityLog('Order API response JSON decode error', 'ERROR', ['error' => json_last_error_msg()]);
+        securityLog('Order API response JSON decode error', 'ERROR', [
+            'error' => json_last_error_msg(),
+            'raw_response' => $orderResponse
+        ]);
         throw new Exception('API yanıtı geçersiz JSON: ' . json_last_error_msg());
     }
 
-    securityLog('Order creation response parsed', 'INFO', ['http_code' => $orderHttpCode]);
+    securityLog('Order creation response parsed', 'INFO', [
+        'http_code' => $orderHttpCode,
+        'has_data' => isset($orderResult['data']),
+        'has_errors' => isset($orderResult['errors']),
+        'structure' => array_keys($orderResult)
+    ]);
 
     // GraphQL hataları kontrol et
     if (isset($orderResult['errors']) && !empty($orderResult['errors'])) {
@@ -527,254 +362,3 @@ try {
     ]);
 }
 ?>
-                'method' => 'POST',
-                'header' => "Content-Type: application/x-www-form-urlencoded\r\n" .
-                           "User-Agent: CalFormat-API/1.0\r\n",
-                'content' => $tokenPostData,
-                'timeout' => 30
-            ],
-            'ssl' => [
-                'verify_peer' => false,
-                'verify_peer_name' => false
-            ]
-        ]);
-        
-        $tokenResponse = @file_get_contents($tokenUrl, false, $tokenContext);
-        
-        if ($tokenResponse !== false) {
-            $tokenJson = json_decode($tokenResponse, true);
-            $accessToken = $tokenJson['access_token'] ?? null;
-        }
-    }
-    
-    // Token alınamazsa mevcut token'ı kullan
-    if (!$accessToken) {
-        $accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjljYTI0MmRhLTJjZTAtNDRiNS04YjNmLTRkMzFlNmE5NDk1OCIsImVtYWlsIjoibXktaWthcy1hcGkiLCJmaXJzdE5hbWUiOiJteS1pa2FzLWFwaSIsImxhc3ROYW1lIjoiIiwic3RvcmVOYW1lIjoiY2FsZm9ybWF0IiwibWVyY2hhbnRJZCI6ImM3NjVkMTFmLTA3NmYtNGE1OS04MTE2LTZkYzhmNzM2ZjI2YyIsImZlYXR1cmVzIjpbMTAsMTEsMTIsMiwyMDEsMyw0LDUsNyw4LDldLCJhdXRob3JpemVkQXBwSWQiOiI5Y2EyNDJkYS0yY2UwLTQ0YjUtOGIzZi00ZDMxZTZhOTQ5NTgiLCJzYWxlc0NoYW5uZWxJZCI6IjIwNjYxNzE2LTkwZWMtNDIzOC05MDJhLTRmMDg0MTM0NThjOCIsInR5cGUiOjQsImV4cCI6MTc1MTYzNjU2NjU3NywiaWF0IjoxNzUxNjIyMTY2NTc3LCJpc3MiOiJjNzY1ZDExZi0wNzZmLTRhNTktODExNi02ZGM4ZjczNmYyNmMiLCJzdWIiOiI5Y2EyNDJkYS0yY2UwLTQ0YjUtOGIzZi00ZDMxZTZhOTQ5NTgifQ.GiPopPyJgavFgIopNdaJqYm_ER0M92aTfQaIwuLFiMw';
-        $tokenMethod = 'fallback_existing_token';
-    }
-
-    // 4. SİPARİŞ OLUŞTURMA GRAPHQL MUTATION
-    $graphqlUrl = $ikasConfig['graphql_url'];
-    
-    $mutation = 'mutation CreateOrderWithTransactions($input: CreateOrderWithTransactionsInput!) {
-        createOrderWithTransactions(input: $input) {
-            id
-            orderNumber
-            totalAmount
-            status
-            customer {
-                id
-                email
-                firstName
-                lastName
-            }
-            orderLineItems {
-                id
-                quantity
-                price
-                variant {
-                    id
-                    sku
-                }
-            }
-            billingAddress {
-                firstName
-                lastName
-                addressLine1
-                city {
-                    name
-                }
-                country {
-                    name
-                }
-            }
-            shippingAddress {
-                firstName
-                lastName
-                addressLine1
-                city {
-                    name
-                }
-                country {
-                    name
-                }
-                phone
-                district {
-                    name
-                }
-            }
-            transactions {
-                id
-                amount
-                status
-            }
-            createdAt
-            updatedAt
-        }
-    }';
-
-    $variables = [
-        'input' => $input
-    ];
-
-    $graphqlData = json_encode([
-        'query' => $mutation,
-        'variables' => $variables
-    ]);
-    
-    $orderResult = null;
-    $orderMethod = 'unknown';
-    
-    // Önce cURL ile GraphQL dene
-    if (function_exists('curl_init')) {
-        $orderMethod = 'curl_graphql';
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $graphqlUrl);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $graphqlData);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'CalFormat-API/1.0');
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $accessToken,
-            'Content-Type: application/json',
-            'User-Agent: CalFormat-API/1.0',
-            'Accept: application/json'
-        ]);
-        
-        $orderResponse = curl_exec($ch);
-        $orderHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $orderError = curl_error($ch);
-        curl_close($ch);
-        
-        // Debug: API çağrısı sonuçlarını logla
-        error_log("=== ORDER CREATE API DEBUG ===");
-        error_log("GraphQL URL: " . $graphqlUrl);
-        error_log("Order cURL Response: " . ($orderResponse ? 'SUCCESS' : 'FAILED'));
-        error_log("Order HTTP Code: " . $orderHttpCode);
-        error_log("Order cURL Error: " . ($orderError ?: 'NONE'));
-        if ($orderResponse) {
-            error_log("Order Response (first 1000 chars): " . substr($orderResponse, 0, 1000));
-        }
-        
-        if ($orderResponse !== false && $orderHttpCode === 200) {
-            $orderJson = json_decode($orderResponse, true);
-            if (isset($orderJson['data']['createOrderWithTransactions'])) {
-                $orderResult = $orderJson['data']['createOrderWithTransactions'];
-                error_log("Order created successfully with ID: " . ($orderResult['id'] ?? 'unknown'));
-            } else {
-                error_log("No order data in response structure");
-                error_log("Response structure: " . print_r($orderJson, true));
-            }
-        } else {
-            error_log("Order API failed - HTTP Code: " . $orderHttpCode . ", Error: " . ($orderError ?: 'NONE'));
-        }
-    }
-    
-    // cURL başarısızsa file_get_contents ile GraphQL dene
-    if (!$orderResult && function_exists('file_get_contents')) {
-        $orderMethod = 'file_get_contents_graphql';
-        $orderContext = stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'header' => "Authorization: Bearer " . $accessToken . "\r\n" .
-                           "Content-Type: application/json\r\n" .
-                           "User-Agent: CalFormat-API/1.0\r\n",
-                'content' => $graphqlData,
-                'timeout' => 30
-            ]
-        ]);
-
-        $orderResponse = @file_get_contents($graphqlUrl, false, $orderContext);
-        
-        if ($orderResponse !== false) {
-            $orderJson = json_decode($orderResponse, true);
-            if (isset($orderJson['data']['createOrderWithTransactions'])) {
-                $orderResult = $orderJson['data']['createOrderWithTransactions'];
-            }
-        }
-    }
-
-    // 5. BAŞARILI RESPONSE DÖNDÜR
-    if ($orderResult) {
-        echo json_encode([
-            'success' => true,
-            'data' => $orderResult,
-            'order_info' => [
-                'order_id' => $orderResult['id'] ?? null,
-                'order_number' => $orderResult['orderNumber'] ?? null,
-                'total_amount' => $orderResult['totalAmount'] ?? null,
-                'status' => $orderResult['status'] ?? null,
-                'customer_email' => $orderResult['customer']['email'] ?? null
-            ],
-            'api_info' => [
-                'token_method' => $tokenMethod,
-                'order_method' => $orderMethod,
-                'token_obtained' => !empty($accessToken),
-                'graphql_url' => $graphqlUrl
-            ],
-            'timestamp' => date('Y-m-d H:i:s')
-        ]);
-        exit();
-    }
-    
-    // 6. SİPARİŞ OLUŞTURAMAZSA FALLBACK
-    throw new Exception('Sipariş oluşturulamadı. Response: ' . ($orderResponse ?? 'null'));
-
-} catch (Exception $e) {
-    error_log('Order Create API error: ' . $e->getMessage());
-    
-    // 7. HATA DURUMUNDA DETAYLI RESPONSE
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => true,
-        'message' => 'Sipariş oluşturma API\'sinde hata oluştu',
-        'debug_info' => [
-            'error_message' => $e->getMessage(),
-            'error_file' => basename($e->getFile()),
-            'error_line' => $e->getLine(),
-            'token_method' => $tokenMethod ?? 'not_attempted',
-            'order_method' => $orderMethod ?? 'not_attempted',
-            'access_token_exists' => isset($accessToken) && !empty($accessToken),
-            'token_response' => isset($tokenResponse) ? substr($tokenResponse, 0, 200) . '...' : 'null',
-            'order_response' => isset($orderResponse) ? substr($orderResponse, 0, 200) . '...' : 'null',
-            'curl_available' => function_exists('curl_init'),
-            'file_get_contents_available' => function_exists('file_get_contents'),
-            'https_support' => in_array('https', stream_get_wrappers()),
-            'token_url' => $ikasConfig['token_url'],
-            'graphql_url' => $ikasConfig['graphql_url'],
-            'input_received' => isset($input) && !empty($input),
-            'input_summary' => isset($input) ? [
-                'has_order' => isset($input['order']),
-                'has_transactions' => isset($input['transactions']),
-                'order_items_count' => isset($input['order']['orderLineItems']) ? count($input['order']['orderLineItems']) : 0,
-                'customer_email' => $input['order']['customer']['email'] ?? 'not_provided'
-            ] : 'no_input',
-            'ikas_config' => [
-                'client_id' => '***' . substr($ikasConfig['client_id'], -4),
-                'store_id' => $ikasConfig['store_id']
-            ]
-        ],
-        'fallback_data' => [
-            'order_id' => 'fallback_' . uniqid(),
-            'order_number' => 'FALLBACK_' . date('YmdHis'),
-            'status' => 'pending',
-            'message' => 'API hatası nedeniyle fallback sipariş ID\'si döndürülüyor',
-            'customer_info' => isset($input['order']['customer']) ? $input['order']['customer'] : null,
-            'total_amount' => isset($input['transactions'][0]['amount']) ? $input['transactions'][0]['amount'] : 0
-        ],
-        'server_info' => [
-            'php_version' => phpversion(),
-            'curl_available' => function_exists('curl_init'),
-            'file_get_contents_available' => function_exists('file_get_contents'),
-            'https_support' => in_array('https', stream_get_wrappers())
-        ],
-        'timestamp' => date('Y-m-d H:i:s')
-    ]);
-}

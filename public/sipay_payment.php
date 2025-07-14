@@ -498,8 +498,13 @@ try {
             
             $token = getSipayToken($sipayConfig);
             
+            // Return URL'yi temizle ve hazırla
+            $baseReturnUrl = str_replace(['www.', '@', 'w'], '', $sipayConfig['return_url']);
+            $baseReturnUrl = preg_replace('/^https?:\/\//', '', $baseReturnUrl);
+            $baseReturnUrl = 'https://' . $baseReturnUrl;
+
             // Return URL'e müşteri bilgilerini de ekle
-            $returnUrl = $sipayConfig['return_url'] . 
+            $returnUrl = $baseReturnUrl . 
                 '?customer_name=' . urlencode($input['name'] ?? $input['customer']['name'] ?? '') .
                 '&customer_surname=' . urlencode($input['surname'] ?? $input['customer']['surname'] ?? '') .
                 '&customer_email=' . urlencode($input['bill_email'] ?? $input['customer']['email'] ?? '') .

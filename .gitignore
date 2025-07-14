@@ -163,7 +163,9 @@ pids
 
 # ===== KRİTİK GÜVENLİK DOSYALARI =====
 # Environment variables
-.env*
+.env
+.env.local
+.env.*.local
 !.env.example
 !public/server_env_template
 
